@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* ===== Tailwind v4 Theme Extension ===== */
+@theme {
+  --color-primary: #5bf4de;
+  --color-secondary: #5de6ff;
+  --color-tertiary: #67ccff;
+  --color-error: #ff716c;
+  --color-background: #010e24;
+  --color-surface: #010e24;
+  --color-surface-container: #061934;
+  --color-surface-container-high: #0b203d;
+  --color-on-surface: #dbe6ff;
+  --color-on-surface-variant: #9eabc8;
+  --color-on-primary: #00594f;
+  --color-outline-variant: #3b4861;
+  --color-primary-container: #0fc9b4;
+  --color-tertiary-container: #1dc0fe;
+
+  --font-headline: "Inter", "Noto Sans TC", sans-serif;
+  --font-body: "Inter", "Noto Sans TC", sans-serif;
+  --font-label: "Space Grotesk", "Noto Sans TC", sans-serif;
+}
+
+/* ===== Base Styles ===== */
+body {
+  background-color: var(--color-background);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== Utility Classes ===== */
+.glass-panel {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(16, 38, 69, 0.4);
+  border: 1px solid rgba(91, 244, 222, 0.1);
+}
+
+.glow-primary { text-shadow: 0 0 20px rgba(91, 244, 222, 0.4); }
+.glow-error { text-shadow: 0 0 20px rgba(255, 113, 108, 0.4); }
+.glow-secondary { text-shadow: 0 0 20px rgba(93, 230, 255, 0.4); }
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(91, 244, 222, 0.2); border-radius: 2px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(91, 244, 222, 0.4); }
