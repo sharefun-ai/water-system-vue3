@@ -9,7 +9,8 @@ function toggleLocale() {
   localStorage.setItem('locale', locale.value)
 }
 
-const waterBgUrl = 'https://lh3.googleusercontent.com/aida/ADBb0ug-UNV0amewV1yut4yeG_awlnD5YP_wMTmPov2B61Eumzri4lvdZclJ_OcrsnGOfjBZf9w6q-RE5N_yeeP3OG35S3FMaV0oWIVyrOL1RDhI8Ho-SK2Tll6POR3mepQrhuawUxjt8TwLyJdfMwFntWFk8_Z_OG3n8EYDdmHWwpuJDqjAYOPF6JWy_Y__nkIxv93SLgpSaRDrKNtIJ_dhjLGraaKCgwyQOT8iGpPOcn8qTo5jFKtDihanWrA'
+import waterBgImg from '../assets/water-bg.png'
+const waterBgUrl = waterBgImg
 
 const cards = [
   { to: '/scada', icon: 'dashboard', titleKey: 'home.scadaPanel', subKey: 'home.controlInterface', color: 'primary', accent: 'rgba(87,241,219,0.5)', glow: 'rgba(87,241,219,0.2)', module: '01' },
@@ -24,6 +25,7 @@ const cards = [
   <!-- Water Background -->
   <div class="realistic-water-bg" :style="{ backgroundImage: `url(${waterBgUrl})` }"></div>
   <div class="realistic-water-bg-caustic" :style="{ backgroundImage: `url(${waterBgUrl})` }"></div>
+  <div class="god-rays"></div>
 
   <!-- HUD Grid -->
   <div class="hud-grid"></div>
@@ -218,6 +220,19 @@ const cards = [
 @keyframes causticDrift {
   0% { background-position: 0% 0%; }
   100% { background-position: 100% 100%; }
+}
+.god-rays {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 40%, rgba(255,255,255,0.02) 100%);
+  mix-blend-mode: overlay;
+  animation: rayShimmer 15s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: -1;
+}
+@keyframes rayShimmer {
+  0% { opacity: 0.3; transform: translateX(-2%); }
+  100% { opacity: 0.6; transform: translateX(2%); }
 }
 
 /* HUD Grid */
