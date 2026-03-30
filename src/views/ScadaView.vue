@@ -21,11 +21,16 @@ const bottomSheetTranslateY = computed(() =>
 let touchStartY = 0
 let touchCurrentY = 0
 
+let isSwiping = false
+
 const toggleBottomSheet = () => {
+  if (isSwiping) return // Prevent click after swipe
   bottomSheetOpen.value = !bottomSheetOpen.value
 }
 const onSheetTouchStart = (e) => {
   touchStartY = e.touches[0].clientY
+  touchCurrentY = touchStartY
+  isSwiping = false
 }
 const onSheetTouchMove = (e) => {
   touchCurrentY = e.touches[0].clientY
@@ -33,8 +38,11 @@ const onSheetTouchMove = (e) => {
 const onSheetTouchEnd = () => {
   const delta = touchCurrentY - touchStartY
   if (Math.abs(delta) > 40) {
-    bottomSheetOpen.value = delta < 0
+    isSwiping = true
+    bottomSheetOpen.value = delta < 0 // swipe up = open, swipe down = close
   }
+  // Reset after a tick so click handler can check isSwiping
+  setTimeout(() => { isSwiping = false }, 50)
 }
 
 // ─── Indicator Positions (% based) ───
