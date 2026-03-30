@@ -30,8 +30,8 @@ const navLinks = [
       :class="app.isMenuOpen ? 'translate-x-0' : 'translate-x-full'"
     >
       <!-- Header -->
-      <div class="p-8 pb-10">
-        <div class="flex items-center justify-between mb-8">
+      <div class="p-5 pb-4 sm:p-8 sm:pb-6 shrink-0">
+        <div class="flex items-center justify-between mb-4 sm:mb-6">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
               <span class="material-symbols-outlined text-on-primary" style="font-variation-settings: 'FILL' 1">water_drop</span>
@@ -52,7 +52,7 @@ const navLinks = [
       </div>
 
       <!-- Nav Links -->
-      <nav class="flex-grow flex flex-col px-2">
+      <nav class="flex-grow flex flex-col px-2 overflow-y-auto">
         <template v-for="link in navLinks" :key="link.key">
           <router-link
             v-if="!link.external"
@@ -80,7 +80,7 @@ const navLinks = [
       </nav>
 
       <!-- Footer -->
-      <div class="p-8 border-t border-outline-variant/10">
+      <div class="p-5 sm:p-8 border-t border-outline-variant/10 shrink-0">
         <div class="flex justify-between items-end">
           <div class="space-y-1">
             <p class="text-[10px] font-label text-on-surface-variant uppercase tracking-widest">{{ $t('common.version') }}</p>

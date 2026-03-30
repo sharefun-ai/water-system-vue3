@@ -323,17 +323,25 @@ const diagramRef = ref(null)
 
 const updateDisplayScale = () => {
   const w = window.innerWidth
+  // Below 1292px — CSS handles it (display: none for value-display)
+  // Only apply JS scaling for 1292~1800px range (medium desktop + zoom)
+  if (w < 1292) return
+
   const zoomLevel =
     Math.round((window.outerWidth / window.innerWidth) * 100) / 100
   const zoomScale = 1 / zoomLevel
 
   let midScale = 1
-  if (w >= 1292 && w <= 1800) {
+  if (w <= 1800) {
     midScale = 0.5 + ((w - 1292) / (1800 - 1292)) * 0.5
   }
-  const finalScale = midScale * zoomScale
 
   if (!diagramRef.value) return
+
+  // Set CSS variable for media query fallback
+  diagramRef.value.style.setProperty('--mid-scale', midScale.toFixed(3))
+
+  const finalScale = midScale * zoomScale
   const displays = diagramRef.value.querySelectorAll('.value-display')
   const lights = diagramRef.value.querySelectorAll('.indicator-light')
   const nameplates = diagramRef.value.querySelectorAll('.indicator-nameplate')
@@ -352,7 +360,7 @@ const updateDisplayScale = () => {
       'important'
     )
   })
-  if (w >= 1292 && w <= 1800) {
+  if (w <= 1800) {
     nameplates.forEach((el) => {
       el.style.setProperty(
         'transform',
@@ -1179,10 +1187,21 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== Responsive: scale down value displays on medium screens ===== */
-@media (max-width: 1279px) {
+/* ===== Responsive: Medium desktop (1292~1800px) — CSS variable fallback ===== */
+@media (min-width: 1292px) and (max-width: 1800px) {
   .value-display {
-    transform: translate(-50%, -50%) scale(0.75) !important;
+    transform: translate(-50%, -50%) scale(var(--mid-scale, 0.7)) !important;
+  }
+  .indicator-nameplate {
+    transform: scale(var(--mid-scale, 0.7));
+    transform-origin: left center;
+  }
+}
+
+/* ===== Responsive: Tablet (< 1292px) — HIDE value displays (match original HTML) ===== */
+@media (max-width: 1291px) {
+  .value-display {
+    display: none !important;
   }
   .indicator-light {
     width: 12px !important;
@@ -1201,7 +1220,7 @@ onBeforeUnmount(() => {
   }
 }
 
-/* Phone: hide nameplates, only dots remain */
+/* ===== Responsive: Phone (< 640px) — minimal indicators ===== */
 @media (max-width: 639px) {
   .indicator-light {
     width: 8px !important;
