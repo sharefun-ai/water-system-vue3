@@ -501,7 +501,7 @@ onUnmounted(() => {
               <th
                 v-for="header in activeHeaders"
                 :key="header"
-                class="px-7 py-4 text-[11px] font-bold text-primary tracking-wider uppercase"
+                class="px-3 sm:px-7 py-3 sm:py-4 text-[10px] sm:text-[11px] font-bold text-primary tracking-wider uppercase whitespace-nowrap"
               >{{ header }}</th>
             </tr>
           </thead>
@@ -510,8 +510,8 @@ onUnmounted(() => {
             <tr v-if="activeTableData.length === 0">
               <td :colspan="activeColSpan" class="text-center py-16 text-white/40">
                 <span class="material-symbols-outlined text-5xl block mb-3 opacity-30">database</span>
-                <div class="text-base font-semibold mb-1">目前尚無任何數據</div>
-                <div class="text-xs opacity-60">該時間區間內沒有找到相關資料</div>
+                <div class="text-base font-semibold mb-1">{{ t('report.noData', '目前尚無任何數據') }}</div>
+                <div class="text-xs opacity-60">{{ t('report.noDataDesc', '該時間區間內沒有找到相關資料') }}</div>
               </td>
             </tr>
             <!-- Data rows -->
@@ -521,11 +521,11 @@ onUnmounted(() => {
               @click="onRowClick(row.date)"
               class="cursor-pointer border-b border-white/[0.04] transition-colors duration-200 hover:bg-primary/[0.04]"
             >
-              <td class="px-7 py-3.5 font-medium text-on-surface">{{ row.date }}</td>
+              <td class="px-3 sm:px-7 py-2.5 sm:py-3.5 font-medium text-on-surface whitespace-nowrap text-xs sm:text-sm">{{ row.date }}</td>
               <td
                 v-for="field in activeFields"
                 :key="field"
-                class="px-7 py-3.5 font-medium text-[15px] text-on-surface/80"
+                class="px-3 sm:px-7 py-2.5 sm:py-3.5 font-medium text-xs sm:text-[15px] text-on-surface/80 whitespace-nowrap"
               >{{ row[field] }}</td>
             </tr>
           </tbody>
