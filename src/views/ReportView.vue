@@ -11,9 +11,8 @@ const today = new Date()
 const currentYear = today.getFullYear()
 const currentMonth = today.getMonth() + 1
 
-const buttons = ['累積流量', '瞬間流量', '其他數值', 'PT數值']
 const buttonKeys = ['cumulativeFlow', 'instantaneousFlow', 'otherValues', 'ptValues']
-const activeButton = ref('累積流量')
+const activeButton = ref('cumulativeFlow')
 
 const selectedYear = ref(currentYear)
 const selectedMonth = ref(currentMonth)
@@ -54,19 +53,19 @@ const categories = [
 
 // ─── Table Column Definitions ───
 const tableColumns = {
-  '累積流量': {
+  cumulativeFlow: {
     headers: ['日期', '入水電磁式流量(累計)', '入水超音波流量(累計)', '產水超音波流量(累計)'],
     fields: ['electromagnetic', 'inflow_ultrasonic', 'outflow_ultrasonic'],
   },
-  '瞬間流量': {
+  instantaneousFlow: {
     headers: ['日期', '入水電磁式流量(瞬間)', '入水超音波流量(瞬間)', '產水超音波流量(瞬間)'],
     fields: ['electromagnetic', 'inflow_ultrasonic', 'outflow_ultrasonic'],
   },
-  '其他數值': {
+  otherValues: {
     headers: ['日期', '導電度計', '產水濁度', '原水液位', '產水液位'],
     fields: ['conductivity', 'turbidity', 'water_level', 'get_water_level'],
   },
-  'PT數值': {
+  ptValues: {
     headers: ['日期', 'PT1', 'PT2', 'PT3', 'PT4'],
     fields: ['PT1', 'PT2', 'PT3', 'PT4'],
   },
@@ -74,18 +73,18 @@ const tableColumns = {
 
 // Detail modal column headers (time replaces date)
 const detailColumns = {
-  '累積流量': ['時間', '入水電磁式流量(累計)', '入水超音波流量(累計)', '產水超音波流量(累計)'],
-  '瞬間流量': ['時間', '入水電磁式流量(瞬間)', '入水超音波流量(瞬間)', '產水超音波流量(瞬間)'],
-  '其他數值': ['時間', '導電度計', '產水濁度', '原水液位', '產水液位'],
-  'PT數值': ['時間', 'PT1', 'PT2', 'PT3', 'PT4'],
+  cumulativeFlow: ['時間', '入水電磁式流量(累計)', '入水超音波流量(累計)', '產水超音波流量(累計)'],
+  instantaneousFlow: ['時間', '入水電磁式流量(瞬間)', '入水超音波流量(瞬間)', '產水超音波流量(瞬間)'],
+  otherValues: ['時間', '導電度計', '產水濁度', '原水液位', '產水液位'],
+  ptValues: ['時間', 'PT1', 'PT2', 'PT3', 'PT4'],
 }
 
 // Name filters per category (for raw data lookup)
 const nameFilters = {
-  '累積流量': ['入水電磁式流量(累計)', '入水超音波流量(累計)', '產水超音波流量(累計)'],
-  '瞬間流量': ['入水電磁式流量(瞬間)', '入水超音波流量(瞬間)', '產水超音波流量(瞬間)'],
-  '其他數值': ['導電度計', '產水濁度', '原水液位', '產水液位'],
-  'PT數值': ['PT1', 'PT2', 'PT3', 'PT4'],
+  cumulativeFlow: ['入水電磁式流量(累計)', '入水超音波流量(累計)', '產水超音波流量(累計)'],
+  instantaneousFlow: ['入水電磁式流量(瞬間)', '入水超音波流量(瞬間)', '產水超音波流量(瞬間)'],
+  otherValues: ['導電度計', '產水濁度', '原水液位', '產水液位'],
+  ptValues: ['PT1', 'PT2', 'PT3', 'PT4'],
 }
 
 // ─── DEMO Data Generation ───
@@ -227,10 +226,10 @@ const organizedDataPressure = computed(() => {
 // Active dataset for the current category
 const activeTableData = computed(() => {
   switch (activeButton.value) {
-    case '累積流量': return organizedData.value
-    case '瞬間流量': return organizedDataInstant.value
-    case '其他數值': return organizedDataOthers.value
-    case 'PT數值': return organizedDataPressure.value
+    case 'cumulativeFlow': return organizedData.value
+    case 'instantaneousFlow': return organizedDataInstant.value
+    case 'otherValues': return organizedDataOthers.value
+    case 'ptValues': return organizedDataPressure.value
     default: return []
   }
 })
@@ -258,20 +257,20 @@ function onRowClick(date) {
     if (!timeMap[item.time]) timeMap[item.time] = {}
     const val = parseFloat(item.value) || 0
 
-    if (activeButton.value === '累積流量') {
+    if (activeButton.value === 'cumulativeFlow') {
       if (item.name === '入水電磁式流量(累計)') timeMap[item.time].electromagnetic = Math.round(val)
       else if (item.name === '入水超音波流量(累計)') timeMap[item.time].inflow_ultrasonic = Math.round(val)
       else if (item.name === '產水超音波流量(累計)') timeMap[item.time].outflow_ultrasonic = Math.round(val)
-    } else if (activeButton.value === '瞬間流量') {
+    } else if (activeButton.value === 'instantaneousFlow') {
       if (item.name === '入水電磁式流量(瞬間)') timeMap[item.time].electromagnetic = val.toFixed(1)
       else if (item.name === '入水超音波流量(瞬間)') timeMap[item.time].inflow_ultrasonic = val.toFixed(1)
       else if (item.name === '產水超音波流量(瞬間)') timeMap[item.time].outflow_ultrasonic = val.toFixed(1)
-    } else if (activeButton.value === '其他數值') {
+    } else if (activeButton.value === 'otherValues') {
       if (item.name === '導電度計') timeMap[item.time].conductivity = val.toFixed(1)
       else if (item.name === '產水濁度') timeMap[item.time].turbidity = val.toFixed(1)
       else if (item.name === '原水液位') timeMap[item.time].water_level = val.toFixed(1)
       else if (item.name === '產水液位') timeMap[item.time].get_water_level = val.toFixed(1)
-    } else if (activeButton.value === 'PT數值') {
+    } else if (activeButton.value === 'ptValues') {
       if (item.name === 'PT1') timeMap[item.time].PT1 = val.toFixed(1)
       else if (item.name === 'PT2') timeMap[item.time].PT2 = val.toFixed(1)
       else if (item.name === 'PT3') timeMap[item.time].PT3 = val.toFixed(1)
@@ -419,21 +418,21 @@ onUnmounted(() => {
       <h1 class="text-3xl lg:text-4xl font-bold text-on-surface font-headline">
         {{ t('report.title', { year: selectedYear, month: selectedMonth }) }}
       </h1>
-      <h2 class="text-lg text-on-surface-variant font-medium mt-1">{{ activeButton }}</h2>
+      <h2 class="text-lg text-on-surface-variant font-medium mt-1">{{ t(`report.${activeButton}`) }}</h2>
     </div>
 
     <!-- Category Buttons -->
-    <div class="flex items-center gap-2.5 mb-4 px-2 overflow-x-auto justify-center scrollbar-hide">
+    <div class="flex items-center gap-2 sm:gap-2.5 mb-4 px-4 overflow-x-auto scrollbar-hide">
       <button
-        v-for="(btn, idx) in buttons"
-        :key="btn"
-        @click="setActive(btn)"
-        class="shrink-0 px-6 py-2.5 rounded-[10px] text-[15px] font-label transition-all duration-200 backdrop-blur-lg whitespace-nowrap"
-        :class="activeButton === btn
+        v-for="key in buttonKeys"
+        :key="key"
+        @click="setActive(key)"
+        class="shrink-0 px-4 sm:px-6 py-2 sm:py-2.5 rounded-[10px] text-[13px] sm:text-[15px] font-label transition-all duration-200 backdrop-blur-lg whitespace-nowrap"
+        :class="activeButton === key
           ? 'bg-primary/15 border border-primary/40 text-primary font-bold shadow-[0_0_12px_rgba(91,244,222,0.15)]'
           : 'bg-white/[0.03] border border-white/[0.08] text-white/60 font-medium hover:border-white/20 hover:text-white/80'"
       >
-        {{ btn }}
+        {{ t(`report.${key}`) }}
       </button>
     </div>
 
