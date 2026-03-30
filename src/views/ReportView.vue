@@ -437,15 +437,15 @@ onUnmounted(() => {
     </div>
 
     <!-- Year/Month + Excel Export Row -->
-    <div class="flex flex-wrap items-center justify-between gap-2.5 mb-6 px-2">
+    <div class="flex items-center justify-between gap-2 mb-6 px-2">
       <!-- Year/Month Selector -->
-      <div class="flex items-center gap-0 bg-white/[0.03] border border-white/[0.06] rounded-xl py-2.5 px-1 backdrop-blur-xl">
-        <div class="flex items-center px-3.5">
-          <span class="material-symbols-outlined text-primary text-xl">calendar_today</span>
+      <div class="flex items-center gap-0 bg-white/[0.03] border border-white/[0.06] rounded-xl py-2 sm:py-2.5 px-1 backdrop-blur-xl min-w-0">
+        <div class="flex items-center px-2 sm:px-3.5">
+          <span class="material-symbols-outlined text-primary text-lg sm:text-xl">calendar_today</span>
         </div>
         <select
           v-model="selectedYear"
-          class="bg-transparent border-none text-on-surface text-base font-semibold cursor-pointer outline-none px-1.5 py-0.5 font-label"
+          class="bg-transparent border-none text-on-surface text-sm sm:text-base font-semibold cursor-pointer outline-none px-1 sm:px-1.5 py-0.5 font-label"
         >
           <option
             v-for="year in yearOptions"
@@ -454,10 +454,10 @@ onUnmounted(() => {
             class="bg-surface-container-high text-on-surface"
           >{{ year }}</option>
         </select>
-        <span class="text-white/30 text-[15px] mx-1">年</span>
+        <span class="text-white/30 text-xs sm:text-[15px] mx-0.5 sm:mx-1">年</span>
         <select
           v-model="selectedMonth"
-          class="bg-transparent border-none text-on-surface text-base font-semibold cursor-pointer outline-none px-1.5 py-0.5 font-label"
+          class="bg-transparent border-none text-on-surface text-sm sm:text-base font-semibold cursor-pointer outline-none px-1 sm:px-1.5 py-0.5 font-label"
         >
           <option
             v-for="month in monthOptions"
@@ -466,16 +466,16 @@ onUnmounted(() => {
             class="bg-surface-container-high text-on-surface"
           >{{ month }}</option>
         </select>
-        <span class="text-white/30 text-[15px] mr-3.5">月</span>
+        <span class="text-white/30 text-xs sm:text-[15px] mr-2 sm:mr-3.5">月</span>
       </div>
 
       <!-- Excel Export Button -->
       <button
         @click="openDateRangeModal()"
-        class="flex items-center gap-2 px-6 py-3 rounded-xl border-none cursor-pointer font-bold text-[15px] text-on-primary font-label shrink-0 transition-transform duration-200 hover:scale-[1.02]"
+        class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl border-none cursor-pointer font-bold text-xs sm:text-[15px] text-on-primary font-label shrink-0 transition-transform duration-200 hover:scale-[1.02]"
         style="background: linear-gradient(135deg, #5bf4de, #0fc9b4); box-shadow: 0 0 15px rgba(91,244,222,0.25);"
       >
-        <span class="material-symbols-outlined text-xl">file_download</span>
+        <span class="material-symbols-outlined text-lg sm:text-xl">file_download</span>
         <span class="hidden sm:inline">{{ t('report.excelExport') }}</span>
       </button>
     </div>
