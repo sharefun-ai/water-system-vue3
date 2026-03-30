@@ -1242,12 +1242,20 @@ onBeforeUnmount(() => {
 /* ===== Responsive: Phone (< 640px) — minimal indicators ===== */
 @media (max-width: 639px) {
   .indicator-light {
-    width: 8px !important;
-    height: 8px !important;
+    width: 5px !important;
+    height: 5px !important;
+    box-shadow: none !important;
+  }
+  .indicator-light::before {
+    display: none;
+  }
+  .indicator-light.on {
+    box-shadow: 0 0 3px rgba(91, 244, 222, 0.4) !important;
   }
   .indicator-light.rectangular {
-    width: 12px !important;
-    height: 8px !important;
+    width: 7px !important;
+    height: 5px !important;
+    border-radius: 2px;
   }
   .indicator-nameplate {
     display: none !important;
