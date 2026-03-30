@@ -323,9 +323,20 @@ const diagramRef = ref(null)
 
 const updateDisplayScale = () => {
   const w = window.innerWidth
-  // Below 1292px — CSS handles it (display: none for value-display)
-  // Only apply JS scaling for 1292~1800px range (medium desktop + zoom)
-  if (w < 1292) return
+  // Below 1292px — CSS handles it (display: none for value-display, smaller lights)
+  if (w < 1292) {
+    // Clear any leftover inline styles from previous desktop scaling
+    if (diagramRef.value) {
+      diagramRef.value.querySelectorAll('.value-display, .indicator-light').forEach((el) => {
+        el.style.removeProperty('transform')
+      })
+      diagramRef.value.querySelectorAll('.indicator-nameplate').forEach((el) => {
+        el.style.removeProperty('transform')
+        el.style.removeProperty('transform-origin')
+      })
+    }
+    return
+  }
 
   const zoomLevel =
     Math.round((window.outerWidth / window.innerWidth) * 100) / 100
