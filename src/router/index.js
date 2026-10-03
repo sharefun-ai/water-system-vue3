@@ -40,6 +40,11 @@ const routes = [
   },
 ]
 
+// Normalize old history URLs before hash history reads the initial location.
+const legacyRoutes = new Set(['/portal','/scada','/scada-classic','/data-trend','/alert-history','/report'])
+const legacyPath = window.location.pathname.replace(/\/$/, '')
+if (!window.location.hash && legacyRoutes.has(legacyPath)) window.history.replaceState(null, '', '/#' + legacyPath + window.location.search)
+
 const router = createRouter({
   history: createWebHashHistory(),
   routes,
