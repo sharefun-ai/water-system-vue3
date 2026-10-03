@@ -84,7 +84,6 @@ uniform float introClock;
 uniform float introDuration;
 uniform float introCalm;
 uniform vec2 wordmarkTexel;
-uniform vec4 introLetters[8];
 float introGrain(vec2 p){return fract(sin(dot(p,vec2(123.4,345.6)))*45678.9);}
 float dropHermite(float a,float b,float m0,float m1,float u,float duration){float u2=u*u,u3=u2*u;return (2.*u3-3.*u2+1.)*a+(u3-2.*u2+u)*m0*duration+(-2.*u3+3.*u2)*b+(u3-u2)*m1*duration;}
 float fallPosition(float t){
@@ -102,7 +101,9 @@ vec3 sunEnvironment(vec3 ray){
  color+=vec3(.78,.90,.97)*exp(-pow((ray.y-.56)/.12,2.))*.75;
  return color;
 }
-vec3 opening(vec3 water,vec2 uv,float aspect,vec2 gradient){
+float dropletBoundary(vec3 point,vec3 radii,float taper){vec3 q=point/radii;float section=max(.5,1.-taper*q.y);return (q.x*q.x+q.z*q.z)/(section*section)+q.y*q.y-1.;}
+vec3 dropletNormal(vec3 point,vec3 radii,float taper){vec3 q=point/radii;float section=max(.5,1.-taper*q.y);return normalize(vec3(q.x/(section*section),q.y+taper*(q.x*q.x+q.z*q.z)/pow(section,3.),q.z/(section*section))/radii);}
+vec3 opening(vec3 water,vec2 uv,float aspect,vec2 gradient,float height,vec2 surfaceSlope){
  if(introEnabled<.5)return water;
  float t=introClock,age=max(0.,t-${INTRO_IMPACT}),distance=length((uv-vec2(.5,.5))*vec2(aspect,1.));
  float front=age*waveSpeed,nearWave=exp(-pow((distance-front)/.035,2.));
@@ -111,26 +112,18 @@ vec3 opening(vec3 water,vec2 uv,float aspect,vec2 gradient){
  float grain=introGrain(floor(uv*resolution*.55));
  // Allow each stroke to respond to the impact before it dissolves.
  float washed=smoothstep(.90,1.95,age-distance/waveSpeed+(grain-.5)*.23)*step(${INTRO_IMPACT},t);
- vec2 direction=normalize((uv-vec2(.5,.5))*vec2(aspect,1.)+vec2(.0001));
- vec2 glyphUv=uv;float settled=0.;
- for(int i=0;i<8;i++){
-  vec4 letter=introLetters[i];if(abs(uv.x-letter.x)>letter.y)continue;
-  vec2 center=vec2(letter.x,.54);float arrival=length((center-vec2(.5,.5))*vec2(aspect,1.))/waveSpeed;
-  float elapsed=max(0.,age-arrival),pulse=step(arrival,age)*step(${INTRO_IMPACT},t),damping=exp(-elapsed*1.6);
-  float spring=sin(elapsed*10.5)*damping*pulse,angle=sin(elapsed*8.8)*damping*pulse*.055*mix(.50,1.,introCalm);
-  vec2 local=(uv-center)*vec2(aspect,1.);local=mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*local;
-  glyphUv=center+local/vec2(aspect,1.)-vec2(spring*.003/aspect,spring*.016)*mix(.50,1.,introCalm);settled=pulse*damping;
-  break;
- }
- vec2 warp=direction/vec2(aspect,1.)*nearWave*sin((distance-front)*100.)*.004*introCalm;
- warp+=gradient*.009*step(${INTRO_IMPACT},t)*introCalm;
- warp+=vec2(sin(uv.y*31.+t*.55),cos(uv.x*19.-t*.42))*.00045;
- glyphUv=clamp(glyphUv+warp,vec2(.001),vec2(.999));vec4 glyph=texture2D(wordmark,glyphUv);
+ // The same height field refracts the sea and every pixel of the lettering.
+ // Pointer ripples and the falling drop both enter that field; there are no
+ // per-letter transforms or independent spring animations.
+ vec2 displacement=gradient*.115*mix(.58,1.,introCalm);
+ displacement/=1.+length(displacement)/.026;
+ vec2 glyphUv=clamp(uv+(displacement+surfaceSlope*.012)/vec2(aspect,1.),vec2(.001),vec2(.999));
+ vec4 glyph=texture2D(wordmark,glyphUv);
  float dissolve=(1.-washed)*reveal*(1.-finish);vec3 viewRay=vec3(0.,0.,-1.);
  if(glyph.a*dissolve>.001){
  float hx=texture2D(wordmark,glyphUv+vec2(wordmarkTexel.x,0.)).r-texture2D(wordmark,glyphUv-vec2(wordmarkTexel.x,0.)).r;
  float hy=texture2D(wordmark,glyphUv+vec2(0.,wordmarkTexel.y)).r-texture2D(wordmark,glyphUv-vec2(0.,wordmarkTexel.y)).r;
- vec3 letterNormal=normalize(vec3(-vec2(hx,hy)*2.5-gradient*settled*.7,.68));
+ vec3 letterNormal=normalize(vec3(-vec2(hx,hy)*2.5-gradient*1.4-surfaceSlope,.68));
  vec3 letterRefracted=refract(viewRay,letterNormal,1./1.333);
  vec3 letterWater=texture2D(ocean,introOceanUv(uv+letterRefracted.xy*.036,aspect)).rgb;
  float letterFresnel=.0204+.9796*pow(1.-max(letterNormal.z,0.),5.);
@@ -140,45 +133,46 @@ vec3 opening(vec3 water,vec2 uv,float aspect,vec2 gradient){
  liquid+=vec3(.80,.89,.91)*pow(1.-abs(glyph.r-.7),9.)*.28;
  float glint=pow(max(dot(reflect(viewRay,letterNormal),normalize(vec3(.53,.63,.57))),0.),48.);
  liquid+=vec3(1.,.96,.85)*glint*.55;
+ liquid+=vec3(.18,.47,.62)*min(.40,length(gradient)*1.5+abs(height)*.12);
  water=mix(water,liquid,glyph.a*dissolve*.92);
  }
  // Faint light follows the departing ink; it falls back into the same water.
- vec2 carried=uv-direction/vec2(aspect,1.)*.016*washed;
- if(nearWave>.01){float dust=texture2D(wordmark,clamp(carried,vec2(0.),vec2(1.))).a;water+=vec3(.22,.55,.77)*dust*nearWave*pow(grain,9.)*.22*(1.-finish);}
+ vec2 carried=glyphUv-displacement/vec2(aspect,1.)*.65*washed;
+ float rippleLight=min(1.,length(gradient)*4.+abs(height)*.15);
+ if(rippleLight>.01){float dust=texture2D(wordmark,clamp(carried,vec2(0.),vec2(1.))).a;water+=vec3(.22,.55,.77)*dust*rippleLight*pow(grain,9.)*.24*(1.-finish);}
  water+=vec3(.08,.30,.44)*nearWave*.12*exp(-age*.5)*step(${INTRO_IMPACT},t);
- // Refraction through both interfaces of a rounded water droplet (IOR 1.333).
+ // An oscillating, elongated drop: a narrower upper shoulder, a rounded lower
+ // body, and a continuous stretch into the impact. Both optical interfaces use
+ // the actual deformed surface, not the normals of a round sphere.
  float fall=fallPosition(t),slow=smoothstep(1.65,1.95,t)*(1.-smoothstep(2.60,2.90,t));
  vec2 center=vec2(.5,1.025-.525*fall);
  vec2 d=(uv-center)*vec2(aspect,1.);
- float rx=.025+slow*.005,ry=rx*(1.13+.035*sin(t*4.5));
- vec2 q=vec2(d.x/rx,d.y/ry);q.x*=1.+q.y*.045;
- float sphere=dot(q,q),edge=1.-smoothstep(.92,1.10,sphere);
+ float acceleration=smoothstep(${INTRO_SLOW_END},${INTRO_IMPACT},t);
+ float rx=.024*(1.+slow*.13-acceleration*.10),ry=rx*(1.56-slow*.13+acceleration*.28+.06*sin(t*7.));
+ float taper=.20+acceleration*.07+.025*sin(t*5.);
+ vec2 q=vec2(d.x/rx,d.y/ry);float section=max(.5,1.-taper*q.y);
+ float boundary=q.x*q.x/(section*section)+q.y*q.y,edge=1.-smoothstep(.95,1.025,boundary);
  float present=smoothstep(${INTRO_DROP_START},1.40,t)*(1.-smoothstep(${INTRO_IMPACT-.03},${INTRO_IMPACT+.02},t));
  if(edge*present>.001){
- vec3 normal=normalize(vec3(q,sqrt(max(.001,1.-min(sphere,.999)))));
- vec3 inside=refract(viewRay,normal,1./1.333),exitPoint=normal+inside*(-2.*dot(normal,inside));
- vec3 through=refract(inside,-normalize(exitPoint),1.333);
- vec2 lensUv=uv+(exitPoint.xy-normal.xy)*rx+through.xy*.095;
+ vec3 radii=vec3(rx,ry,rx),entryPoint=vec3(d,sqrt(max(.00001,(1.-q.y*q.y)*section*section-q.x*q.x))*rx);
+ vec3 normal=dropletNormal(entryPoint,radii,taper),inside=refract(viewRay,normal,1./1.333);
+ // Find the second interface along the refracted ray, then bisect its surface.
+ float lower=.00001,upper=max(rx,ry)*4.;
+ for(int i=0;i<12;i++){float middle=(lower+upper)*.5;if(dropletBoundary(entryPoint+inside*middle,radii,taper)<0.)lower=middle;else upper=middle;}
+ vec3 exitPoint=entryPoint+inside*((lower+upper)*.5),exitNormal=dropletNormal(exitPoint,radii,taper);
+ vec3 through=refract(inside,-exitNormal,1.333);
+ vec2 lensUv=uv+(exitPoint.xy-entryPoint.xy)/vec2(aspect,1.)+through.xy*.065;
  vec3 transmitted=texture2D(ocean,introOceanUv(lensUv,aspect)).rgb*1.08;
  float transmittedLuma=dot(transmitted,vec3(.2126,.7152,.0722));transmitted=mix(transmitted,vec3(transmittedLuma)*vec3(.97,1.,1.02),.40);
  float fresnel=.0204+.9796*pow(1.-max(normal.z,0.),5.);
  vec3 glass=mix(transmitted,sunEnvironment(reflect(viewRay,normal)),fresnel);
- float meniscus=exp(-pow((sqrt(sphere)-.91)/.055,2.));glass+=vec3(.68,.80,.84)*meniscus*.12;
- float internalCaustic=exp(-pow((length(q-vec2(-.21,-.17))-.67)/.075,2.))*smoothstep(-.15,.35,-q.y)*slow;
- glass+=vec3(1.,.94,.80)*internalCaustic*.40;
- vec2 sunPoint=q-vec2(.30,.34);float sunshine=exp(-dot(sunPoint,sunPoint)/.007);
- float opticalGlare=exp(-sunPoint.x*sunPoint.x/.0004-abs(sunPoint.y)*16.)+exp(-sunPoint.y*sunPoint.y/.0004-abs(sunPoint.x)*16.);
- glass+=vec3(1.,.98,.90)*(sunshine*1.20+opticalGlare*.10)*(.40+.60*slow);
+ float meniscus=exp(-pow((sqrt(boundary)-.93)/.035,2.));glass+=vec3(.68,.80,.84)*meniscus*.18;
+ float internalCaustic=pow(max(dot(-exitNormal,normalize(vec3(.53,.63,.57))),0.),24.);
+ glass+=vec3(1.,.94,.80)*internalCaustic*(.25+.42*slow);
+ float sunGlint=pow(max(dot(reflect(viewRay,normal),normalize(vec3(.53,.63,.57))),0.),85.);
+ glass+=vec3(1.,.98,.90)*sunGlint*(1.4+slow*.7);
  water=mix(water,glass,edge*present);
  }
- // The sun passes through the lens into a short, restrained shaft of light.
- vec2 sunlight=normalize(vec2(-.53,-.63));float along=dot(d,sunlight),across=dot(d,vec2(-sunlight.y,sunlight.x));
- float beam=exp(-pow(across/(.008+max(along,0.)*.10),2.))*smoothstep(.027,.06,along)*(1.-smoothstep(.06,.19,along));
- water+=vec3(.85,.88,.80)*beam*.12*present*slow*mix(.65,1.,introCalm);
- float incoming=exp(-pow(across/.025,2.))*smoothstep(.04,.10,-along)*(1.-smoothstep(.12,.29,-along));
- water+=vec3(.85,.88,.80)*incoming*.025*present*slow;
- float focus=exp(-dot(d-sunlight*.075,d-sunlight*.075)/.00011);
- water+=vec3(.93,.94,.83)*focus*.23*slow*present;
  float impact=exp(-distance*distance/.0025)*exp(-age*7.)*step(${INTRO_IMPACT},t);
  water+=vec3(.32,.67,.91)*impact*.30*introCalm;
  return water;

@@ -4,12 +4,12 @@ import { useRouter } from 'vue-router'
 import TwinIcon from '../digital-twin/TwinIcon.vue'
 import { PROCESS_LINKS } from '../brand/processStory.js'
 import { createWaterSound } from '../brand/waterSound.js'
-import { claimWaterIntro, WORDMARK_LETTERS, WORDMARK_WIDTH } from '../brand/waterIntro.js'
+import { claimWaterIntro } from '../brand/waterIntro.js'
 import ocean from '../assets/ocean-depth.webp'
 import './brand-home.css'
 
 const router=useRouter(),surface=ref(null),ready=ref(false),paused=ref(false),touched=ref(false),menuOpen=ref(false),entering=ref(''),audio=ref('waiting'),audioLevel=ref(0),voiceCount=ref(0)
-const opening=ref(claimWaterIntro()),openingPhase=ref('wordmark')
+const opening=ref(claimWaterIntro()),openingPhase=ref('preparing')
 let water,sound,media,disposed=false,timer
 function enter(item){
   if(opening.value||entering.value)return
@@ -38,7 +38,6 @@ onBeforeUnmount(()=>{disposed=true;clearTimeout(timer);water?.dispose();sound?.d
     <div ref="surface" class="water-surface" role="button" :tabindex="opening?-1:0" aria-label="觸碰水面：滑鼠點擊、拖曳或觸控可產生水波與藍色流光，第一次點擊啟動水聲旋律；也可按 Enter 或空白鍵。" />
     <div class="water-shade" aria-hidden="true" />
     <div v-if="opening" class="water-opening" role="status" aria-label="AQUATIC 開場：水滴落下，波紋沖散品牌字樣">
-      <svg class="water-opening-fallback" :class="{'is-hidden':ready}" :viewBox="`0 0 ${WORDMARK_WIDTH} 100`" fill="none" stroke="url(#water-opening-glass)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><linearGradient id="water-opening-glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#849da9"/><stop offset=".35" stop-color="#d5e8eb"/><stop offset=".55" stop-color="#55777f"/><stop offset="1" stop-color="#acced6"/></linearGradient></defs><path v-for="(letter,index) in WORDMARK_LETTERS" :key="index" :d="letter.path" :transform="`translate(${letter.x},0)`"/><circle :cx="WORDMARK_WIDTH-5" cy="85" r="4.5" fill="#b3dce2" stroke="none" /></svg>
       <button class="water-opening-skip" aria-label="略過 AQUATIC 開場動畫" @click="skipOpening"><span>略過</span><TwinIcon name="arrow" :size="16" /></button>
     </div>
     <header class="water-topbar" :inert="opening">

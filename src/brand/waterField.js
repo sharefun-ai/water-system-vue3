@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import oceanUrl from '../assets/ocean-depth.webp'
 import { EQUIPMENT, PIPELINES } from '../digital-twin/topology.js'
-import { createIntroWordmark, wordmarkLayout, dropFall, introDuration, INTRO_FRAGMENT, INTRO_DROP_START, INTRO_SLOW_START, INTRO_SLOW_END, INTRO_IMPACT } from './waterIntro.js'
+import { createIntroWordmark, dropFall, introDuration, INTRO_FRAGMENT, INTRO_DROP_START, INTRO_SLOW_START, INTRO_SLOW_END, INTRO_IMPACT } from './waterIntro.js'
+import { createWaterReadyGate } from './waterReadiness.js'
 
 const QUAD_VERTEX=`varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}`
 const WAVE_STEP=`precision highp float;
@@ -38,7 +39,7 @@ void main(){
  float caustic=pow(max(0.,1.-abs(sin(p.x*15.+sin(p.y*11.+t*.12)+normalXY.x*5.)+sin(p.y*18.+cos(p.x*12.-t*.1)+normalXY.y*5.))*.62),6.);
  float crest=min(.9,length(grad)*1.9);base+=vec3(.12,.58,.90)*(response*.23+crest*.18+bloom*.17);base+=vec3(.16,.54,.70)*caustic*(.021+energy*.07);
  float grain=hash(floor(refracted*resolution*.36));base+=vec3(.38,.75,.92)*pow(grain,80.)*response*.22;
- base*=1.-.22*pow(length((vUv-.5)*vec2(.8,1.)),1.3);base=opening(base,vUv,aspect,grad);base=mix(base,vec3(.015,.06,.095),entering*.85);gl_FragColor=vec4(base,1.);
+ base*=1.-.22*pow(length((vUv-.5)*vec2(.8,1.)),1.3);base=opening(base,vUv,aspect,grad,h,surfaceSlope);base=mix(base,vec3(.015,.06,.095),entering*.85);gl_FragColor=vec4(base,1.);
 }`
 const INFORMATION_VERTEX=`precision highp float;
 attribute float progress;attribute float seed;uniform float aspect;uniform float clock;uniform float entering;uniform float waveSpeed;uniform vec4 touches[8];uniform float pointsMode;uniform float ratio;varying float opacity;
@@ -51,22 +52,22 @@ const INFORMATION_FRAGMENT=`precision highp float;uniform float pointsMode;varyi
 export function createWaterField(host,options={}){
  let disposed=false,paused=false,quiet=!!options.quiet,visible=true,frame,previous=0,lastDraw=0,time=0,ambientTime=0,accumulator=0,frames=0,clicks=0,energy=0,entering=0,entryTarget=0,aspect=1
  let renderer,targetA,targetB,waveMaterial,waterMaterial,image,observer,resizeObserver,canvas2d,ctx2d,simWidth=1,simHeight=1,simulated=false,drops=[],lastHover=0,lastPoint
- let introActive=!!options.intro,introTime=0,introLength=7,introHit=false,introState='',brandTexture,photoReady=false
+ let introActive=!!options.intro,introTime=0,introLength=7,introHit=false,introState='preparing',brandTexture,photoReady=false
+ const readiness=createWaterReadyGate(()=>options.onReady?.())
  const activePointers=new Map(),touches=Array.from({length:8},()=>new THREE.Vector4(-10,-10,-100,0)),dropUniforms=Array.from({length:8},()=>new THREE.Vector4()),owned=[]
  const geometry=new THREE.PlaneGeometry(2,2),camera=new THREE.OrthographicCamera(-1,1,1,-1,0,1),scene=new THREE.Scene(),simScene=new THREE.Scene();owned.push(geometry)
- const photo=new THREE.TextureLoader().load(oceanUrl,()=>{photoReady=true;if(!disposed)drawOnce()},undefined,()=>{photoReady=true});photo.colorSpace=THREE.NoColorSpace;owned.push(photo)
- const uniforms={ocean:{value:photo},field:{value:photo},resolution:{value:new THREE.Vector2(1,1)},texel:{value:new THREE.Vector2(1,1)},clock:{value:0},ambientClock:{value:0},simulated:{value:0},energy:{value:0},entering:{value:0},waveSpeed:{value:.23},touches:{value:touches},wordmark:{value:photo},wordmarkTexel:{value:new THREE.Vector2(1,1)},introLetters:{value:Array.from({length:8},()=>new THREE.Vector4())},introEnabled:{value:introActive?1:0},introClock:{value:0},introDuration:{value:7},introCalm:{value:quiet?.35:1}}
+ const photo=new THREE.TextureLoader().load(oceanUrl,()=>{if(!canvas2d){photoReady=true;readiness.assetReady();if(!disposed)drawOnce()}},undefined,()=>{if(!canvas2d){photoReady=true;readiness.assetReady()}});photo.colorSpace=THREE.NoColorSpace;owned.push(photo)
+ const uniforms={ocean:{value:photo},field:{value:photo},resolution:{value:new THREE.Vector2(1,1)},texel:{value:new THREE.Vector2(1,1)},clock:{value:0},ambientClock:{value:0},simulated:{value:0},energy:{value:0},entering:{value:0},waveSpeed:{value:.23},touches:{value:touches},wordmark:{value:photo},wordmarkTexel:{value:new THREE.Vector2(1,1)},introEnabled:{value:introActive?1:0},introClock:{value:0},introDuration:{value:7},introCalm:{value:quiet?.35:1}}
  let information=[]
- function updateData(){const canvas=renderer?.domElement||canvas2d;if(canvas)Object.assign(canvas.dataset,{renderer:renderer?simulated?'water-gpu-wave':'water-webgl-analytic':'water-canvas',frames:String(frames),time:time.toFixed(2),touches:String(clicks),motion:paused?'paused':'playing',energy:energy.toFixed(3),nodes:String(EQUIPMENT.length),branches:String(PIPELINES.length),intro:introActive?introState:'complete',introTime:introTime.toFixed(2)})}
+ function updateData(){const canvas=renderer?.domElement||canvas2d;if(canvas)Object.assign(canvas.dataset,{renderer:renderer?simulated?'water-gpu-wave':'water-webgl-analytic':'water-canvas',ready:String(readiness.ready),frames:String(frames),time:time.toFixed(2),touches:String(clicks),motion:paused?'paused':'playing',energy:energy.toFixed(3),nodes:String(EQUIPMENT.length),branches:String(PIPELINES.length),intro:introActive?introState:'complete',introTime:introTime.toFixed(2)})}
  function finishIntro(){if(!introActive)return;introActive=false;uniforms.introEnabled.value=0;uniforms.wordmark.value=photo;brandTexture?.dispose();brandTexture=undefined;options.onIntroComplete?.();updateData()}
  function updateIntro(delta){
-  if(!introActive)return
+  if(!introActive||!readiness.ready)return
   introTime=Math.min(introLength,introTime+delta)
-  if(!photoReady&&time<8)introTime=Math.min(introTime,1.2)
   uniforms.introClock.value=introTime
   const state=introTime<INTRO_DROP_START?'wordmark':introTime>=INTRO_SLOW_START&&introTime<INTRO_SLOW_END?'slow-motion':introTime<INTRO_IMPACT?'droplet':'ripple'
   if(state!==introState){introState=state;options.onIntroState?.(state)}
-  if(introTime>=INTRO_IMPACT&&!introHit){introHit=true;ripple(.5,.5,1.25,false)}
+  if(introTime>=INTRO_IMPACT&&!introHit){introHit=true;ripple(.5,.5,1.25,false,true)}
   if(introTime>=introLength)finishIntro()
  }
  function stop(){cancelAnimationFrame(frame);frame=undefined;previous=0}
@@ -96,7 +97,7 @@ export function createWaterField(host,options={}){
   if(disposed)return;const width=host.clientWidth,height=host.clientHeight;if(!width||!height)return;aspect=width/height
   if(renderer){const ratio=Math.min(window.devicePixelRatio||1,width<768?1.25:1.5,Math.sqrt(1600000/(width*height)));renderer.setPixelRatio(ratio);renderer.setSize(width,height,false);uniforms.resolution.value.set(width*ratio,height*ratio);allocateSimulation();buildInformation()}
   else if(canvas2d){canvas2d.width=Math.floor(width);canvas2d.height=Math.floor(height)}
-  if(introActive){brandTexture?.dispose();brandTexture=new THREE.CanvasTexture(createIntroWordmark(aspect));brandTexture.colorSpace=THREE.NoColorSpace;brandTexture.minFilter=THREE.LinearFilter;brandTexture.generateMipmaps=false;uniforms.wordmark.value=brandTexture;uniforms.wordmarkTexel.value.set(1/brandTexture.image.width,1/brandTexture.image.height);wordmarkLayout(aspect).forEach((letter,i)=>uniforms.introLetters.value[i].set(letter.x,letter.halfWidth,0,0));introLength=introDuration(aspect,uniforms.waveSpeed.value);uniforms.introDuration.value=introLength}
+  if(introActive){brandTexture?.dispose();brandTexture=new THREE.CanvasTexture(createIntroWordmark(aspect));brandTexture.colorSpace=THREE.NoColorSpace;brandTexture.minFilter=THREE.LinearFilter;brandTexture.generateMipmaps=false;uniforms.wordmark.value=brandTexture;uniforms.wordmarkTexel.value.set(1/brandTexture.image.width,1/brandTexture.image.height);introLength=introDuration(aspect,uniforms.waveSpeed.value);uniforms.introDuration.value=introLength}
   drawOnce()
  }
  function simulationStep(){waveMaterial.uniforms.state.value=targetA.texture;const count=Math.min(8,drops.length);for(let i=0;i<count;i++){const drop=drops.shift();dropUniforms[i].set(drop.x,drop.y,drop.radius,drop.strength)}waveMaterial.uniforms.dropCount.value=count;renderer.setRenderTarget(targetB);renderer.render(simScene,camera);renderer.setRenderTarget(null);const swap=targetA;targetA=targetB;targetB=swap;uniforms.field.value=targetA.texture}
@@ -109,12 +110,17 @@ export function createWaterField(host,options={}){
    ctx2d.fillStyle=`rgba(2,15,25,${.55*(1-Math.min(1,introTime/introLength))})`;ctx2d.fillRect(0,0,w,h)
    ctx2d.save();ctx2d.globalAlpha=Math.min(1,introTime/.9)*Math.min(1,(introLength-introTime)/1.1)
    if(age>.9){ctx2d.beginPath();ctx2d.rect(0,0,w,h);ctx2d.arc(w/2,h/2,Math.max(0,radius-.9*uniforms.waveSpeed.value*h),0,Math.PI*2,true);ctx2d.clip('evenodd')}
-   const displacement=age>0?Math.sin(age*10)*Math.exp(-age*1.6)*h*.006:0
-   ctx2d.drawImage(brandTexture.image,0,displacement,w,h);ctx2d.restore()
-   if(introTime>INTRO_DROP_START&&introTime<INTRO_IMPACT){const fall=dropFall(introTime),x=w/2,y=h*(-.025+.525*fall),radius=h*.027;const glass=ctx2d.createRadialGradient(x-radius*.3,y-radius*.35,0,x,y,radius*1.1);glass.addColorStop(0,'#f2f7e6d9');glass.addColorStop(.2,'#dceff580');glass.addColorStop(.7,'#40606b60');glass.addColorStop(1,'#bbd0d9b0');ctx2d.beginPath();ctx2d.ellipse(x,y,radius,radius*1.13,0,0,Math.PI*2);ctx2d.fillStyle=glass;ctx2d.fill()}
+   const source=brandTexture.image,cell=Math.max(12,Math.ceil(w/90)),scaleX=source.width/w,scaleY=source.height/h
+   for(let y=h*.32;y<h*.63;y+=cell)for(let x=w*.08;x<w*.92;x+=cell){
+    let dx=0,dy=0
+    for(const touch of touches){const elapsed=time-touch.z;if(elapsed<0||elapsed>10)continue;const px=x/h-touch.x,py=1-y/h-touch.y,distance=Math.hypot(px,py),front=distance-elapsed*uniforms.waveSpeed.value,envelope=Math.exp(-front*front/.014-elapsed*.37)*touch.w,slope=Math.cos(front*72)*envelope;dx+=px/Math.max(.001,distance)*slope*h*.008;dy-=py/Math.max(.001,distance)*slope*h*.008}
+    ctx2d.drawImage(source,x*scaleX,y*scaleY,cell*scaleX,cell*scaleY,x+dx,y+dy,cell+1,cell+1)
+   }
+   ctx2d.restore()
+   if(introTime>INTRO_DROP_START&&introTime<INTRO_IMPACT){const fall=dropFall(introTime),x=w/2,y=h*(-.025+.525*fall),radius=h*.024,stretch=1.5+.3*fall;const glass=ctx2d.createRadialGradient(x-radius*.3,y-radius*.35,0,x,y,radius*1.1);glass.addColorStop(0,'#f2f7e6d9');glass.addColorStop(.2,'#dceff580');glass.addColorStop(.7,'#40606b60');glass.addColorStop(1,'#bbd0d9b0');ctx2d.beginPath();ctx2d.moveTo(x,y-radius*stretch);ctx2d.bezierCurveTo(x+radius*.6,y-radius*stretch*.65,x+radius*1.2,y+radius*.5,x,y+radius*stretch);ctx2d.bezierCurveTo(x-radius*1.2,y+radius*.5,x-radius*.6,y-radius*stretch*.65,x,y-radius*stretch);ctx2d.fillStyle=glass;ctx2d.fill()}
   }
  }
- function drawOnce(){if(disposed)return;if(renderer){uniforms.clock.value=time;uniforms.ambientClock.value=ambientTime;uniforms.energy.value=energy;uniforms.entering.value=entering;renderer.render(scene,camera)}else if(ctx2d)drawCanvas();frames++;updateData()}
+ function drawOnce(){if(disposed)return;if(renderer){uniforms.clock.value=time;uniforms.ambientClock.value=ambientTime;uniforms.energy.value=energy;uniforms.entering.value=entering;renderer.render(scene,camera)}else if(ctx2d)drawCanvas();if(photoReady&&host.clientWidth&&host.clientHeight)readiness.frameRendered();frames++;updateData()}
  function render(stamp){
   if(!canRun()){stop();return}frame=requestAnimationFrame(render);const interval=introActive?33:host.clientWidth<768||quiet?50:33;if(stamp-lastDraw<interval)return
   const delta=previous?Math.min(.07,(stamp-previous)/1000):0;previous=stamp;lastDraw=stamp;time+=delta;ambientTime+=delta*(quiet?.24:1);energy*=Math.exp(-delta*.5);entering+=(entryTarget-entering)*Math.min(1,delta*6)
@@ -122,15 +128,15 @@ export function createWaterField(host,options={}){
   if(simulated){accumulator+=delta;let steps=0;while(accumulator>=1/60&&steps++<4){simulationStep();accumulator-=1/60}}drawOnce()
  }
  function resume(){stop();if(canRun())frame=requestAnimationFrame(render)}
- function ripple(x,y,strength=1,audible=true){
+ function ripple(x,y,strength=1,audible=true,impact=false){
   if(disposed||paused&&!audible)return;if(paused){paused=false;options.onPause?.(false);resume()}
   x=Math.max(.005,Math.min(.995,x));y=Math.max(.005,Math.min(.995,y));touches.pop();touches.unshift(new THREE.Vector4(x*aspect,y,time,strength))
-  if(drops.length<16)drops.push({x,y,radius:audible?.031:.019,strength:strength*(audible?.25:.08)})
+  if(drops.length<16)drops.push({x,y,radius:(audible||impact)?.031:.019,strength:strength*((audible||impact)?.25:.08)})
   energy=Math.min(1,energy+strength*.33);if(audible){clicks++;options.onTouch?.(x,y,strength);options.onInteract?.()}updateData()
  }
  function point(event){const bounds=host.getBoundingClientRect();return[(event.clientX-bounds.left)/bounds.width,1-(event.clientY-bounds.top)/bounds.height]}
- function down(event){if(introActive||event.button!==0)return;const[x,y]=point(event);activePointers.set(event.pointerId,{x,y,at:performance.now()});host.setPointerCapture?.(event.pointerId);ripple(x,y,.95,true)}
- function move(event){if(introActive)return;const[x,y]=point(event),now=performance.now(),active=activePointers.get(event.pointerId);if(active){if(now-active.at<75||Math.hypot((x-active.x)*aspect,y-active.y)<.014)return;activePointers.set(event.pointerId,{x,y,at:now});ripple(x,y,.40,true)}else if(event.pointerType==='mouse'&&now-lastHover>150&&(!lastPoint||Math.hypot((x-lastPoint[0])*aspect,y-lastPoint[1])>.035)){lastHover=now;lastPoint=[x,y];ripple(x,y,.18,false)}}
+ function down(event){if(!readiness.ready||event.button!==0)return;const[x,y]=point(event);activePointers.set(event.pointerId,{x,y,at:performance.now()});host.setPointerCapture?.(event.pointerId);ripple(x,y,.95,true)}
+ function move(event){if(!readiness.ready)return;const[x,y]=point(event),now=performance.now(),active=activePointers.get(event.pointerId);if(active){if(now-active.at<75||Math.hypot((x-active.x)*aspect,y-active.y)<.014)return;activePointers.set(event.pointerId,{x,y,at:now});ripple(x,y,.40,true)}else if(event.pointerType==='mouse'&&now-lastHover>150&&(!lastPoint||Math.hypot((x-lastPoint[0])*aspect,y-lastPoint[1])>.035)){lastHover=now;lastPoint=[x,y];ripple(x,y,.18,false)}}
  function up(event){activePointers.delete(event.pointerId)}
  function key(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();if(introActive){finishIntro();drawOnce()}else ripple(.5,.52,1,true)}}
  function visibility(){resume()}
@@ -143,13 +149,13 @@ export function createWaterField(host,options={}){
   host.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-hidden','true');renderer.domElement.addEventListener('webglcontextlost',lost)
  }catch{
   renderer?.dispose();renderer=undefined;simulated=false
-  canvas2d=document.createElement('canvas');canvas2d.setAttribute('aria-hidden','true');ctx2d=canvas2d.getContext('2d');host.appendChild(canvas2d);image=new Image();image.onload=()=>{photoReady=true;if(!disposed)drawOnce()};image.onerror=()=>{photoReady=true};image.src=oceanUrl
+  canvas2d=document.createElement('canvas');canvas2d.setAttribute('aria-hidden','true');ctx2d=canvas2d.getContext('2d');host.appendChild(canvas2d);image=new Image();image.onload=()=>{photoReady=true;readiness.assetReady();if(!disposed)drawOnce()};image.onerror=()=>{photoReady=true;readiness.assetReady()};image.src=oceanUrl
  }
  host.addEventListener('pointerdown',down);host.addEventListener('pointermove',move);host.addEventListener('pointerup',up);host.addEventListener('pointercancel',up);host.addEventListener('keydown',key);document.addEventListener('visibilitychange',visibility)
  resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;resume()});observer.observe(host)
- resize();resume();options.onReady?.();if(!introActive)ripple(.56,.52,.65,false)
+ resize();resume();if(!introActive)ripple(.56,.52,.65,false)
  return{
   ripple,skipIntro(){finishIntro();ripple(.5,.5,.65,false);drawOnce()},pause(value){paused=value;resume();updateData()},quiet(value){quiet=value;uniforms.introCalm.value=value?.35:1},enter(){entryTarget=1},reset(){entryTarget=0;entering=0;drawOnce()},
-  dispose(){disposed=true;stop();resizeObserver?.disconnect();observer?.disconnect();document.removeEventListener('visibilitychange',visibility);host.removeEventListener('pointerdown',down);host.removeEventListener('pointermove',move);host.removeEventListener('pointerup',up);host.removeEventListener('pointercancel',up);host.removeEventListener('keydown',key);renderer?.domElement.removeEventListener('webglcontextlost',lost);targetA?.dispose();targetB?.dispose();brandTexture?.dispose();information.forEach(object=>{object.geometry.dispose();object.material.dispose()});owned.forEach(resource=>resource.dispose());if(image){image.onload=null;image.onerror=null}renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();activePointers.clear();drops=[]},
+  dispose(){disposed=true;readiness.dispose();stop();resizeObserver?.disconnect();observer?.disconnect();document.removeEventListener('visibilitychange',visibility);host.removeEventListener('pointerdown',down);host.removeEventListener('pointermove',move);host.removeEventListener('pointerup',up);host.removeEventListener('pointercancel',up);host.removeEventListener('keydown',key);renderer?.domElement.removeEventListener('webglcontextlost',lost);targetA?.dispose();targetB?.dispose();brandTexture?.dispose();information.forEach(object=>{object.geometry.dispose();object.material.dispose()});owned.forEach(resource=>resource.dispose());if(image){image.onload=null;image.onerror=null}renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();activePointers.clear();drops=[]},
  }
 }
