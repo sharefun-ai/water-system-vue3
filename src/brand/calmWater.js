@@ -1,5 +1,5 @@
-// Small capillary waves, in physical screen-height coordinates. The shader and
-// Canvas fallback share these modes, so neither relies on a photographed sea.
+// Small surface-normal waves in physical screen-height coordinates. The light
+// below the water uses an organic connected mesh rather than closed contours.
 const DETAIL = 2.2
 const MODES = [
   [8.27, 6.19, .0025, .32, .4],
@@ -23,17 +23,27 @@ void calmWaves(vec2 p,float t,out vec2 slope,out vec3 curvature){
  ${MODES.map(([x,y,a,s,p])=>`calmWave(p,t,vec2(${gl(x)},${gl(y)}),${gl(a)},${gl(s)},${gl(p)},slope,curvature);`).join('\n ')}
 }
 vec3 calmWaterBelow(vec2 uv,float aspect,float t){
- vec2 p=(uv-.5)*vec2(aspect,1.),slope;vec3 curvature;
- calmWaves(p+vec2(.13,-.08),t,slope,curvature);
- // The determinant of the refracted light map concentrates sunlight into
- // moving caustic ribbons. A finite aperture keeps the focus soft and bounded.
- float depth=1.35,determinant=(1.+depth*curvature.x)*(1.+depth*curvature.z)-pow(depth*curvature.y,2.);
- float caustic=.15/(abs(determinant)+.14);
+ vec2 p=(uv-.5)*vec2(aspect,1.);
+ p+=vec2(sin(p.y*16.1+sin(p.x*4.3+t*.09)*1.2-t*.075),sin(p.x*15.7+cos(p.y*5.2-t*.08)*1.1+t*.065))*.040;
+ p=p*9.2+vec2(.13,-.08);
+ vec2 cell=floor(p),f=fract(p);float first=8.,second=8.;
+ // Light joins into a continuous, gently bending mesh. The old curvature
+ // contour produced isolated oval outlines that read as floating objects.
+ for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){
+  vec2 offset=vec2(float(x),float(y)),n=cell+offset;
+  vec3 q=fract(vec3(n.x,n.y,n.x)*vec3(.1031,.1030,.0973));q+=dot(q,q.yzx+33.33);
+  vec2 phase=fract((q.xx+q.yz)*q.zy)*6.2831853;
+  vec2 site=offset+.5+sin(phase+t*.22)*.36;
+  float distance=length(site-f);
+  if(distance<first){second=first;first=distance;}else second=min(second,distance);
+ }
+ float edge=max(0.,second-first),ribbon=exp(-pow(edge/.060,2.)),core=exp(-pow(edge/.017,2.));
+ float openness=smoothstep(.18,.80,.5+.5*sin(p.x*.56+p.y*.71+t*.10+cos(p.y*1.23-t*.08)));
  vec2 light=(uv-vec2(.74,.77))*vec2(aspect*.75,1.);
  float illumination=exp(-dot(light,light)*1.8);
- vec3 bed=mix(vec3(.009,.040,.065),vec3(.035,.175,.180),illumination*.88);
- bed+=vec3(.19,.56,.60)*caustic*(.10+.15*illumination);
- bed+=vec3(.10,.20,.22)*exp(-abs(determinant)*5.)*.06;
+ vec3 bed=mix(vec3(.016,.070,.120),vec3(.055,.260,.360),illumination*.88);
+ bed+=vec3(.50,.80,.89)*ribbon*openness*(.085+.07*illumination);
+ bed+=vec3(.64,.85,.93)*core*openness*.035;
  return bed;
 }
 vec3 calmWaterReflection(vec3 ray){
@@ -45,19 +55,34 @@ vec3 calmWaterReflection(vec3 ray){
 }
 `
 
-export function sampleCalmWater(u, v, aspect, time) {
-  const px=(u-.5)*aspect+.13,py=v-.5-.08
-  const x=px+Math.sin(py*3.4+px*.73-time*.075)*.14,y=py+Math.sin(px*4.1-py*1.15+time*.065)*.14
-  let xx=0,xy=0,yy=0
-  for(const [kx,ky,amplitude,speed,phase] of MODES){
-    const curve=-amplitude*Math.sin(x*kx+y*ky-time*speed+phase)
-    xx+=kx*kx*curve;xy+=kx*ky*curve;yy+=ky*ky*curve
+const fract=value=>value-Math.floor(value)
+function movingSite(x,y,time){
+  let a=fract(x*.1031),b=fract(y*.1030),c=fract(x*.0973)
+  const dot=a*(b+33.33)+b*(c+33.33)+c*(a+33.33)
+  a+=dot;b+=dot;c+=dot
+  return [.5+Math.sin(fract((a+b)*c)*6.2831853+time*.22)*.36,.5+Math.sin(fract((a+c)*b)*6.2831853+time*.22)*.36]
+}
+
+export function sampleCalmWater(u, v, aspect, time, sites) {
+  const px=(u-.5)*aspect,py=v-.5
+  const x=(px+Math.sin(py*16.1+Math.sin(px*4.3+time*.09)*1.2-time*.075)*.040)*9.2+.13,y=(py+Math.sin(px*15.7+Math.cos(py*5.2-time*.08)*1.1+time*.065)*.040)*9.2-.08
+  const cellX=Math.floor(x),cellY=Math.floor(y),fx=fract(x),fy=fract(y)
+  let first=8,second=8
+  for(let dy=-1;dy<=1;dy++){
+    let row=sites?.get(cellY+dy)
+    if(sites&&!row){row=new Map();sites.set(cellY+dy,row)}
+    for(let dx=-1;dx<=1;dx++){
+      let site=row?.get(cellX+dx)
+      if(!site){site=movingSite(cellX+dx,cellY+dy,time);row?.set(cellX+dx,site)}
+      const deltaX=dx+site[0]-fx,deltaY=dy+site[1]-fy,distance=deltaX*deltaX+deltaY*deltaY
+      if(distance<first){second=first;first=distance}else second=Math.min(second,distance)
+    }
   }
-  const determinant=(1+1.35*xx)*(1+1.35*yy)-(1.35*xy)**2
-  const caustic=.15/(Math.abs(determinant)+.14)
+  const edge=Math.max(0,Math.sqrt(second)-Math.sqrt(first)),ribbon=Math.exp(-((edge/.060)**2)),core=Math.exp(-((edge/.017)**2))
+  const lightWeight=Math.max(0,Math.min(1,((.5+.5*Math.sin(x*.56+y*.71+time*.10+Math.cos(y*1.23-time*.08)))-.18)/.62))
+  const openness=lightWeight*lightWeight*(3-2*lightWeight)
   const illumination=Math.exp(-(((u-.74)*aspect*.75)**2+(v-.77)**2)*1.8)
-  const focus=Math.exp(-Math.abs(determinant)*5)*.06
-  return [.009,.040,.065].map((base,i)=>base+([.035,.175,.180][i]-base)*illumination*.88+[.19,.56,.60][i]*caustic*(.10+.15*illumination)+[.10,.20,.22][i]*focus)
+  return [.016,.070,.120].map((base,i)=>base+([.055,.260,.360][i]-base)*illumination*.88+[.50,.80,.89][i]*ribbon*openness*(.085+.07*illumination)+[.64,.85,.93][i]*core*openness*.035)
 }
 
 export function createCalmWaterPainter() {
@@ -66,8 +91,9 @@ export function createCalmWaterPainter() {
     const aspect=width/height,bufferHeight=Math.max(80,Math.round(Math.min(170,280/aspect))),bufferWidth=Math.max(64,Math.round(bufferHeight*aspect))
     if(!canvas){canvas=document.createElement('canvas');context=canvas.getContext('2d')}
     if(canvas.width!==bufferWidth||canvas.height!==bufferHeight){canvas.width=bufferWidth;canvas.height=bufferHeight;pixels=context.createImageData(bufferWidth,bufferHeight)}
+    const sites=new Map()
     for(let y=0;y<bufferHeight;y++)for(let x=0;x<bufferWidth;x++){
-      const color=sampleCalmWater(x/bufferWidth,1-y/bufferHeight,aspect,time),index=(y*bufferWidth+x)*4
+      const color=sampleCalmWater(x/bufferWidth,1-y/bufferHeight,aspect,time,sites),index=(y*bufferWidth+x)*4
       for(let i=0;i<3;i++)pixels.data[index+i]=Math.round(color[i]*255)
       pixels.data[index+3]=255
     }
