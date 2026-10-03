@@ -6,6 +6,10 @@ import i18n from './i18n'
 import App from './App.vue'
 import './style.css'
 
+const legacyRoutes = new Set(['/portal','/scada','/scada-classic','/data-trend','/alert-history','/report'])
+const legacyPath = window.location.pathname.replace(/\/$/, '')
+if (!window.location.hash && legacyRoutes.has(legacyPath)) window.history.replaceState(null, '', '/#' + legacyPath + window.location.search)
+
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)

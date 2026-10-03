@@ -1,0 +1,14 @@
+/* Screen-space names retain legible text while the equipment rotates. */
+.equipment-labels{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+.label-leaders{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.label-leaders path{fill:none;stroke:var(--label-color);stroke-width:1;opacity:.6;vector-effect:non-scaling-stroke}
+.label-leaders circle{fill:var(--label-color);stroke:#0b131e;stroke-width:1}
+.label-leaders .is-selected path{stroke-width:1.5;opacity:.95}
+.twin-app .equipment-label{position:absolute;left:0;top:0;display:flex;align-items:center;justify-content:center;gap:9px;padding:0 9px;pointer-events:auto;white-space:nowrap;background:#122431f5;border:1px solid #526f83;border-radius:6px;box-shadow:0 2px 7px #0005;color:#e0eff7;text-align:left;line-height:1;transition:background .18s,border-color .18s,box-shadow .18s}
+.equipment-label b{font:600 var(--tag-font) 'Space Grotesk',monospace;color:var(--label-color);flex-shrink:0}
+.equipment-label span{font:500 var(--label-font) 'Noto Sans TC',sans-serif;letter-spacing:0}
+.twin-app .equipment-label:hover{background:#254238;border-color:#a0e9ce}
+.twin-app .equipment-label.is-selected{background:#193830;border-color:#a0e9ce;box-shadow:0 0 12px #8ae3ba32}
+.twin-app.has-motion .equipment-label.is-selected{animation:annotation-breathe 3s ease-in-out infinite}
+@keyframes annotation-breathe{0%,100%{box-shadow:0 2px 7px #0005,0 0 7px #8ae3ba18}50%{box-shadow:0 2px 7px #0005,0 0 13px #8ae3ba48}}
+.viewport-tools{z-index:3}.viewport-topline,.orbit-hint{z-index:3}

@@ -1,0 +1,354 @@
+[
+  {
+    "element_no": 101,
+    "name": "PT1",
+    "type": "analog",
+    "unit": "kg/cm²",
+    "warning": "> 5",
+    "models": "UF-01 / PT1"
+  },
+  {
+    "element_no": 102,
+    "name": "PT2",
+    "type": "analog",
+    "unit": "kg/cm²",
+    "warning": "> 5",
+    "models": "UF-01 / PT2"
+  },
+  {
+    "element_no": 103,
+    "name": "PT3",
+    "type": "analog",
+    "unit": "kg/cm²",
+    "warning": "> 5",
+    "models": "UF-01 / PT3"
+  },
+  {
+    "element_no": 104,
+    "name": "PT4",
+    "type": "analog",
+    "unit": "kg/cm²",
+    "warning": "> 5",
+    "models": "UF-01 / PT4"
+  },
+  {
+    "element_no": 106,
+    "name": "入水電磁式流量(瞬間)",
+    "type": "analog",
+    "unit": "m³/h",
+    "warning": "> 100",
+    "models": "FIT-01"
+  },
+  {
+    "element_no": 107,
+    "name": "入水超音波流量(瞬間)",
+    "type": "analog",
+    "unit": "m³/h",
+    "warning": "> 100",
+    "models": "FIT-02"
+  },
+  {
+    "element_no": 108,
+    "name": "產水超音波流量(瞬間)",
+    "type": "analog",
+    "unit": "m³/h",
+    "warning": "> 100",
+    "models": "FIT-03"
+  },
+  {
+    "element_no": 109,
+    "name": "入水電磁式流量(累計)",
+    "type": "analog",
+    "unit": "m³",
+    "warning": "",
+    "models": "FIT-01"
+  },
+  {
+    "element_no": 110,
+    "name": "入水超音波流量(累計)",
+    "type": "analog",
+    "unit": "m³",
+    "warning": "",
+    "models": "FIT-02"
+  },
+  {
+    "element_no": 111,
+    "name": "產水超音波流量(累計)",
+    "type": "analog",
+    "unit": "m³",
+    "warning": "",
+    "models": "FIT-03"
+  },
+  {
+    "element_no": 112,
+    "name": "導電度計",
+    "type": "analog",
+    "unit": "μS/cm",
+    "warning": "",
+    "models": "EC-01"
+  },
+  {
+    "element_no": 113,
+    "name": "產水濁度",
+    "type": "analog",
+    "unit": "NTU",
+    "warning": "> 1",
+    "models": "TU-01"
+  },
+  {
+    "element_no": 114,
+    "name": "原水液位",
+    "type": "analog",
+    "unit": "cm",
+    "warning": "< 0.5",
+    "models": "T-01"
+  },
+  {
+    "element_no": 115,
+    "name": "產水液位",
+    "type": "analog",
+    "unit": "cm",
+    "warning": "< 0.5",
+    "models": "T-02"
+  },
+  {
+    "element_no": 120,
+    "name": "原水液位HH",
+    "type": "level",
+    "unit": "",
+    "warning": "",
+    "models": "T-01"
+  },
+  {
+    "element_no": 121,
+    "name": "原水液位H",
+    "type": "level",
+    "unit": "",
+    "warning": "",
+    "models": "T-01"
+  },
+  {
+    "element_no": 122,
+    "name": "原水液位L",
+    "type": "level",
+    "unit": "",
+    "warning": "",
+    "models": "T-01"
+  },
+  {
+    "element_no": 123,
+    "name": "原水液位LL",
+    "type": "level",
+    "unit": "",
+    "warning": "",
+    "models": "T-01"
+  },
+  {
+    "element_no": 157,
+    "name": "原水液位M",
+    "type": "level",
+    "unit": "",
+    "warning": "",
+    "models": "T-01"
+  },
+  {
+    "element_no": 124,
+    "name": "SV1-1",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV1-1"
+  },
+  {
+    "element_no": 125,
+    "name": "SV1",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV1"
+  },
+  {
+    "element_no": 126,
+    "name": "SV2",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV2"
+  },
+  {
+    "element_no": 127,
+    "name": "SV3",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV3"
+  },
+  {
+    "element_no": 128,
+    "name": "SV4",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV4"
+  },
+  {
+    "element_no": 129,
+    "name": "SV5",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV5"
+  },
+  {
+    "element_no": 130,
+    "name": "SV6",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV6"
+  },
+  {
+    "element_no": 131,
+    "name": "SV7",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV7"
+  },
+  {
+    "element_no": 132,
+    "name": "SV8",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV8"
+  },
+  {
+    "element_no": 133,
+    "name": "SV9",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV9"
+  },
+  {
+    "element_no": 134,
+    "name": "SV10",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV10"
+  },
+  {
+    "element_no": 135,
+    "name": "SV11",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV11"
+  },
+  {
+    "element_no": 136,
+    "name": "SV12",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV12"
+  },
+  {
+    "element_no": 137,
+    "name": "SV13",
+    "type": "valve",
+    "unit": "",
+    "warning": "",
+    "models": "SV13"
+  },
+  {
+    "element_no": 138,
+    "name": "UF產水槽HH",
+    "type": "level",
+    "unit": "",
+    "warning": "",
+    "models": "T-02"
+  },
+  {
+    "element_no": 139,
+    "name": "UF產水槽H",
+    "type": "level",
+    "unit": "",
+    "warning": "",
+    "models": "T-02"
+  },
+  {
+    "element_no": 140,
+    "name": "UF產水槽L",
+    "type": "level",
+    "unit": "",
+    "warning": "",
+    "models": "T-02"
+  },
+  {
+    "element_no": 158,
+    "name": "UF產水槽M",
+    "type": "level",
+    "unit": "",
+    "warning": "",
+    "models": "T-02"
+  },
+  {
+    "element_no": 143,
+    "name": "過濾泵A",
+    "type": "pump",
+    "unit": "",
+    "warning": "",
+    "models": "P-01A"
+  },
+  {
+    "element_no": 144,
+    "name": "過濾泵B",
+    "type": "pump",
+    "unit": "",
+    "warning": "",
+    "models": "P-01B"
+  },
+  {
+    "element_no": 145,
+    "name": "逆洗泵A",
+    "type": "pump",
+    "unit": "",
+    "warning": "",
+    "models": "P-02A"
+  },
+  {
+    "element_no": 146,
+    "name": "逆洗泵B",
+    "type": "pump",
+    "unit": "",
+    "warning": "",
+    "models": "P-02B"
+  },
+  {
+    "element_no": 147,
+    "name": "NaOCI加藥機A",
+    "type": "pump",
+    "unit": "",
+    "warning": "",
+    "models": "D-01A"
+  },
+  {
+    "element_no": 148,
+    "name": "NaOCI加藥機B",
+    "type": "pump",
+    "unit": "",
+    "warning": "",
+    "models": "D-01B"
+  },
+  {
+    "element_no": 149,
+    "name": "藥液循環泵",
+    "type": "pump",
+    "unit": "",
+    "warning": "",
+    "models": "P-03"
+  }
+]

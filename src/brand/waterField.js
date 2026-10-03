@@ -1,0 +1,129 @@
+import * as THREE from 'three'
+import oceanUrl from '../assets/ocean-depth.webp'
+import { EQUIPMENT, PIPELINES } from '../digital-twin/topology.js'
+
+const QUAD_VERTEX=`varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}`
+const WAVE_STEP=`precision highp float;
+varying vec2 vUv;uniform sampler2D state;uniform vec2 texel;uniform float aspect;uniform vec4 drops[8];uniform int dropCount;
+void main(){
+ vec2 previous=texture2D(state,vUv).rg;
+ float neighbours=texture2D(state,vUv+vec2(texel.x,0.)).r+texture2D(state,vUv-vec2(texel.x,0.)).r+texture2D(state,vUv+vec2(0.,texel.y)).r+texture2D(state,vUv-vec2(0.,texel.y)).r;
+ float height=(2.*previous.r-previous.g+.47*(neighbours-4.*previous.r))*.995;
+ for(int i=0;i<8;i++){if(i>=dropCount)break;vec2 p=(vUv-drops[i].xy)*vec2(aspect,1.);float q=dot(p,p)/(drops[i].z*drops[i].z);height-=drops[i].w*(1.-q)*exp(-q);}
+ float edge=min(min(vUv.x,1.-vUv.x)*aspect,min(vUv.y,1.-vUv.y));height*=smoothstep(0.,.018,edge);
+ gl_FragColor=vec4(clamp(height,-1.5,1.5),previous.r,0.,1.);
+}`
+const WATER_FRAGMENT=`precision highp float;
+varying vec2 vUv;uniform sampler2D ocean;uniform sampler2D field;uniform vec2 resolution;uniform vec2 texel;
+uniform float clock;uniform float ambientClock;uniform float simulated;uniform float energy;uniform float entering;uniform float waveSpeed;uniform vec4 touches[8];
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.)),f.x),f.y);}
+float fallbackHeight(vec2 p){float h=0.;for(int i=0;i<8;i++){float age=clock-touches[i].z;if(age<0.||age>11.)continue;float d=length(p-touches[i].xy),front=d-age*waveSpeed;float envelope=exp(-front*front/.014)*exp(-age*.37)*touches[i].w;h+=sin(front*72.)*envelope*.09;}return h;}
+void main(){
+ float aspect=resolution.x/resolution.y;vec2 p=vUv*vec2(aspect,1.),grad=vec2(0.);float h=0.;
+ if(simulated>.5){h=texture2D(field,vUv).r;grad=vec2(texture2D(field,vUv+vec2(texel.x,0.)).r-texture2D(field,vUv-vec2(texel.x,0.)).r,texture2D(field,vUv+vec2(0.,texel.y)).r-texture2D(field,vUv-vec2(0.,texel.y)).r)*2.7;}
+ else{h=fallbackHeight(p);grad=vec2(fallbackHeight(p+vec2(.003,0.))-fallbackHeight(p-vec2(.003,0.)),fallbackHeight(p+vec2(0.,.003))-fallbackHeight(p-vec2(0.,.003)))*12.;}
+ float t=ambientClock,a=dot(p,vec2(13.,8.))-t*.38,b=dot(p,vec2(-21.,17.))-t*.49,c=dot(p,vec2(37.,29.))-t*.71;
+ vec2 surfaceSlope=cos(a)*vec2(.047,.029)+cos(b)*vec2(-.027,.022)+cos(c)*vec2(.018,.014),normalXY=grad+surfaceSlope;
+ vec3 normal=normalize(vec3(-normalXY,1.));vec2 imageUv=vUv;float imageAspect=1.7768;
+ if(aspect<imageAspect)imageUv.x=(vUv.x-.5)*(aspect/imageAspect)+.58;else imageUv.y=(vUv.y-.5)*(imageAspect/aspect)+.5;
+ vec2 drift=vec2(sin(t*.065),cos(t*.051))*.009,refracted=clamp(imageUv+normalXY*.036+drift,vec2(.003),vec2(.997));
+ vec3 photo=texture2D(ocean,refracted).rgb;float luminance=dot(photo,vec3(.2126,.7152,.0722));vec3 base=mix(photo,vec3(luminance)*vec3(.49,.85,1.12),.46)*.85+vec3(.005,.035,.055);
+ float reflection=pow(max(dot(reflect(normalize(vec3(-.25,-.65,-1.5)),normal),vec3(0.,0.,1.)),0.),25.),silk=pow(max(dot(normal,normalize(vec3(-.13,.09,1.))),0.),90.);
+ base+=vec3(.54,.78,.92)*reflection*.15+vec3(.10,.23,.31)*silk*.1;
+ float response=0.,bloom=0.;
+ for(int i=0;i<8;i++){float age=clock-touches[i].z;if(age<0.||age>11.)continue;float d=length(p-touches[i].xy),front=d-age*waveSpeed;float wave=exp(-front*front/.0038)*exp(-age*.31)*touches[i].w;float ripple=.5+.5*sin(front*68.+noise(p*13.)*.7);response+=wave*pow(ripple,5.);bloom+=exp(-d*d/.018)*exp(-age*1.6)*touches[i].w;}
+ float caustic=pow(max(0.,1.-abs(sin(p.x*15.+sin(p.y*11.+t*.12)+normalXY.x*5.)+sin(p.y*18.+cos(p.x*12.-t*.1)+normalXY.y*5.))*.62),6.);
+ float crest=min(.9,length(grad)*1.9);base+=vec3(.12,.58,.90)*(response*.23+crest*.18+bloom*.17);base+=vec3(.16,.54,.70)*caustic*(.021+energy*.07);
+ float grain=hash(floor(refracted*resolution*.36));base+=vec3(.38,.75,.92)*pow(grain,80.)*response*.22;
+ base*=1.-.22*pow(length((vUv-.5)*vec2(.8,1.)),1.3);base=mix(base,vec3(.015,.06,.095),entering*.85);gl_FragColor=vec4(base,1.);
+}`
+const INFORMATION_VERTEX=`precision highp float;
+attribute float progress;attribute float seed;uniform float aspect;uniform float clock;uniform float entering;uniform float waveSpeed;uniform vec4 touches[8];uniform float pointsMode;uniform float ratio;varying float opacity;
+void main(){vec2 uv=position.xy;float response=0.;for(int i=0;i<8;i++){float age=clock-touches[i].z;if(age<0.||age>10.)continue;float d=length(uv*vec2(aspect,1.)-touches[i].xy),front=d-age*waveSpeed;response+=exp(-front*front/.012)*exp(-age*.29)*touches[i].w;}
+ float moving=pow(.5+.5*sin(progress*14.-clock*1.1+seed),12.);opacity=(pointsMode>.5?.045:.006)+response*(pointsMode>.5?.31:.095)*(pointsMode>.5?1.:.35+moving*.65);opacity*=1.-entering;
+ vec2 drift=vec2(sin(uv.y*21.+clock*.35),cos(uv.x*17.+clock*.3))*.0018*response;gl_Position=vec4((uv+drift)*2.-1.,.1,1.);gl_PointSize=(pointsMode>.5?3.2:1.)*ratio*(1.+response*.35);
+}`
+const INFORMATION_FRAGMENT=`precision highp float;uniform float pointsMode;varying float opacity;void main(){float alpha=opacity;if(pointsMode>.5){float d=length(gl_PointCoord-.5);alpha*=1.-smoothstep(.10,.5,d);}gl_FragColor=vec4(.35,.79,1.,alpha);}`
+
+export function createWaterField(host,options={}){
+ let disposed=false,paused=false,quiet=!!options.quiet,visible=true,frame,previous=0,lastDraw=0,time=0,ambientTime=0,accumulator=0,frames=0,clicks=0,energy=0,entering=0,entryTarget=0,aspect=1
+ let renderer,targetA,targetB,waveMaterial,waterMaterial,image,observer,resizeObserver,canvas2d,ctx2d,simWidth=1,simHeight=1,simulated=false,drops=[],lastHover=0,lastPoint
+ const activePointers=new Map(),touches=Array.from({length:8},()=>new THREE.Vector4(-10,-10,-100,0)),dropUniforms=Array.from({length:8},()=>new THREE.Vector4()),owned=[]
+ const geometry=new THREE.PlaneGeometry(2,2),camera=new THREE.OrthographicCamera(-1,1,1,-1,0,1),scene=new THREE.Scene(),simScene=new THREE.Scene();owned.push(geometry)
+ const photo=new THREE.TextureLoader().load(oceanUrl,()=>{if(!disposed)drawOnce()});photo.colorSpace=THREE.NoColorSpace;owned.push(photo)
+ const uniforms={ocean:{value:photo},field:{value:photo},resolution:{value:new THREE.Vector2(1,1)},texel:{value:new THREE.Vector2(1,1)},clock:{value:0},ambientClock:{value:0},simulated:{value:0},energy:{value:0},entering:{value:0},waveSpeed:{value:.23},touches:{value:touches}}
+ let information=[]
+ function updateData(){const canvas=renderer?.domElement||canvas2d;if(canvas)Object.assign(canvas.dataset,{renderer:renderer?simulated?'water-gpu-wave':'water-webgl-analytic':'water-canvas',frames:String(frames),time:time.toFixed(2),touches:String(clicks),motion:paused?'paused':'playing',energy:energy.toFixed(3),nodes:String(EQUIPMENT.length),branches:String(PIPELINES.length)})}
+ function stop(){cancelAnimationFrame(frame);frame=undefined;previous=0}
+ function canRun(){return !disposed&&!paused&&visible&&!document.hidden}
+ function mapping(position){const u=position[0]/32+.5,v=position[2]/20+.5;return aspect<.9?[.17+v*.66,.85-u*.66]:[.12+u*.76,.82-v*.64]}
+ function buildInformation(){
+  information.forEach(object=>{scene.remove(object);object.geometry.dispose();object.material.dispose()});information=[];if(!renderer)return
+  const uniformsFor=pointsMode=>({aspect:{value:aspect},clock:uniforms.clock,entering:uniforms.entering,waveSpeed:uniforms.waveSpeed,touches:uniforms.touches,pointsMode:{value:pointsMode},ratio:{value:renderer.getPixelRatio()}})
+  const make=(positions,progresses,seeds,points)=>{
+   const shape=new THREE.BufferGeometry();shape.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));shape.setAttribute('progress',new THREE.Float32BufferAttribute(progresses,1));shape.setAttribute('seed',new THREE.Float32BufferAttribute(seeds,1))
+   const material=new THREE.ShaderMaterial({vertexShader:INFORMATION_VERTEX,fragmentShader:INFORMATION_FRAGMENT,uniforms:uniformsFor(points?1:0),transparent:true,depthTest:false,depthWrite:false,blending:THREE.AdditiveBlending})
+   const object=points?new THREE.Points(shape,material):new THREE.LineSegments(shape,material);object.frustumCulled=false;object.renderOrder=2;scene.add(object);information.push(object)
+  }
+  make(EQUIPMENT.flatMap(item=>[...mapping(item.position),0]),EQUIPMENT.map(()=>0),EQUIPMENT.map((_,i)=>i*.7),true)
+  const positions=[],progresses=[],seeds=[]
+  PIPELINES.forEach((pipe,index)=>{let distance=0;for(let i=1;i<pipe.points.length;i++){const a=mapping(pipe.points[i-1]),b=mapping(pipe.points[i]),length=Math.hypot(b[0]-a[0],b[1]-a[1]),segments=Math.max(1,Math.ceil(length/.007));for(let j=0;j<segments;j++)for(const fraction of [j/segments,(j+1)/segments]){positions.push(a[0]+(b[0]-a[0])*fraction,a[1]+(b[1]-a[1])*fraction,0);progresses.push(distance+length*fraction);seeds.push(index*.8)}distance+=length}})
+  make(positions,progresses,seeds,false)
+ }
+ function allocateSimulation(){
+  if(!simulated)return;targetA?.dispose();targetB?.dispose()
+  simHeight=Math.max(80,Math.round(Math.min(256,448/aspect)));simWidth=Math.max(64,Math.round(simHeight*aspect))
+  const parameters={type:THREE.HalfFloatType,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,depthBuffer:false,stencilBuffer:false}
+  targetA=new THREE.WebGLRenderTarget(simWidth,simHeight,parameters);targetB=targetA.clone();renderer.setRenderTarget(targetA);renderer.clearColor();renderer.setRenderTarget(targetB);renderer.clearColor();renderer.setRenderTarget(null)
+  uniforms.field.value=targetA.texture;uniforms.texel.value.set(1/simWidth,1/simHeight);waveMaterial.uniforms.texel.value.copy(uniforms.texel.value);waveMaterial.uniforms.aspect.value=aspect;uniforms.waveSpeed.value=Math.sqrt(.47)*60/simHeight;accumulator=0;drops=[]
+ }
+ function resize(){
+  if(disposed)return;const width=host.clientWidth,height=host.clientHeight;if(!width||!height)return;aspect=width/height
+  if(renderer){const ratio=Math.min(window.devicePixelRatio||1,width<768?1.25:1.5,Math.sqrt(1600000/(width*height)));renderer.setPixelRatio(ratio);renderer.setSize(width,height,false);uniforms.resolution.value.set(width*ratio,height*ratio);allocateSimulation();buildInformation()}
+  else if(canvas2d){canvas2d.width=Math.floor(width);canvas2d.height=Math.floor(height)}drawOnce()
+ }
+ function simulationStep(){waveMaterial.uniforms.state.value=targetA.texture;const count=Math.min(8,drops.length);for(let i=0;i<count;i++){const drop=drops.shift();dropUniforms[i].set(drop.x,drop.y,drop.radius,drop.strength)}waveMaterial.uniforms.dropCount.value=count;renderer.setRenderTarget(targetB);renderer.render(simScene,camera);renderer.setRenderTarget(null);const swap=targetA;targetA=targetB;targetB=swap;uniforms.field.value=targetA.texture}
+ function drawCanvas(){
+  const w=canvas2d.width,h=canvas2d.height;ctx2d.fillStyle='#073343';ctx2d.fillRect(0,0,w,h)
+  if(image?.complete&&image.naturalWidth){const scale=Math.max(w/image.naturalWidth,h/image.naturalHeight)*1.04;ctx2d.drawImage(image,(w-image.naturalWidth*scale)/2+Math.sin(ambientTime*.07)*4,(h-image.naturalHeight*scale)/2+Math.cos(ambientTime*.06)*4,image.naturalWidth*scale,image.naturalHeight*scale);ctx2d.fillStyle='rgba(3,22,43,.22)';ctx2d.fillRect(0,0,w,h)}
+  for(const touch of touches){const age=time-touch.z;if(age<0||age>10)continue;const x=touch.x/aspect*w,y=(1-touch.y)*h,r=Math.max(1,age*uniforms.waveSpeed.value*h),alpha=Math.exp(-age*.35)*touch.w;const halo=ctx2d.createRadialGradient(x,y,Math.max(0,r-24),x,y,r+24);halo.addColorStop(0,'rgba(100,210,255,0)');halo.addColorStop(.5,`rgba(100,210,255,${alpha*.24})`);halo.addColorStop(1,'rgba(100,210,255,0)');ctx2d.fillStyle=halo;ctx2d.fillRect(x-r-30,y-r-30,r*2+60,r*2+60);for(let i=0;i<3;i++){ctx2d.beginPath();ctx2d.arc(x,y,Math.max(1,r-i*12),0,Math.PI*2);ctx2d.strokeStyle=`rgba(156,223,255,${alpha*.19/(i+1)})`;ctx2d.lineWidth=1.4;ctx2d.stroke()}}
+ }
+ function drawOnce(){if(disposed)return;if(renderer){uniforms.clock.value=time;uniforms.ambientClock.value=ambientTime;uniforms.energy.value=energy;uniforms.entering.value=entering;renderer.render(scene,camera)}else if(ctx2d)drawCanvas();frames++;updateData()}
+ function render(stamp){
+  if(!canRun()){stop();return}frame=requestAnimationFrame(render);const interval=host.clientWidth<768||quiet?50:33;if(stamp-lastDraw<interval)return
+  const delta=previous?Math.min(.07,(stamp-previous)/1000):0;previous=stamp;lastDraw=stamp;time+=delta;ambientTime+=delta*(quiet?.24:1);energy*=Math.exp(-delta*.5);entering+=(entryTarget-entering)*Math.min(1,delta*6)
+  if(simulated){accumulator+=delta;let steps=0;while(accumulator>=1/60&&steps++<4){simulationStep();accumulator-=1/60}}drawOnce()
+ }
+ function resume(){stop();if(canRun())frame=requestAnimationFrame(render)}
+ function ripple(x,y,strength=1,audible=true){
+  if(disposed||paused&&!audible)return;if(paused){paused=false;options.onPause?.(false);resume()}
+  x=Math.max(.005,Math.min(.995,x));y=Math.max(.005,Math.min(.995,y));touches.pop();touches.unshift(new THREE.Vector4(x*aspect,y,time,strength))
+  if(drops.length<16)drops.push({x,y,radius:audible?.031:.019,strength:strength*(audible?.25:.08)})
+  energy=Math.min(1,energy+strength*.33);if(audible){clicks++;options.onTouch?.(x,y,strength);options.onInteract?.()}updateData()
+ }
+ function point(event){const bounds=host.getBoundingClientRect();return[(event.clientX-bounds.left)/bounds.width,1-(event.clientY-bounds.top)/bounds.height]}
+ function down(event){if(event.button!==0)return;const[x,y]=point(event);activePointers.set(event.pointerId,{x,y,at:performance.now()});host.setPointerCapture?.(event.pointerId);ripple(x,y,.95,true)}
+ function move(event){const[x,y]=point(event),now=performance.now(),active=activePointers.get(event.pointerId);if(active){if(now-active.at<75||Math.hypot((x-active.x)*aspect,y-active.y)<.014)return;activePointers.set(event.pointerId,{x,y,at:now});ripple(x,y,.40,true)}else if(event.pointerType==='mouse'&&now-lastHover>150&&(!lastPoint||Math.hypot((x-lastPoint[0])*aspect,y-lastPoint[1])>.035)){lastHover=now;lastPoint=[x,y];ripple(x,y,.18,false)}}
+ function up(event){activePointers.delete(event.pointerId)}
+ function key(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();ripple(.5,.52,1,true)}}
+ function visibility(){resume()}
+ function lost(event){event.preventDefault();stop();options.onError?.()}
+ try{
+  renderer=new THREE.WebGLRenderer({alpha:false,antialias:false,depth:false,stencil:false,powerPreference:'high-performance'});renderer.setClearColor(0x000000,1);renderer.autoClear=true
+  waterMaterial=new THREE.ShaderMaterial({vertexShader:QUAD_VERTEX,fragmentShader:WATER_FRAGMENT,uniforms,depthTest:false,depthWrite:false});owned.push(waterMaterial);scene.add(new THREE.Mesh(geometry,waterMaterial))
+  simulated=renderer.extensions.has('EXT_color_buffer_float');uniforms.simulated.value=simulated?1:0
+  if(simulated){waveMaterial=new THREE.ShaderMaterial({vertexShader:QUAD_VERTEX,fragmentShader:WAVE_STEP,uniforms:{state:{value:null},texel:{value:new THREE.Vector2()},aspect:{value:1},drops:{value:dropUniforms},dropCount:{value:0}},depthTest:false,depthWrite:false});owned.push(waveMaterial);simScene.add(new THREE.Mesh(geometry,waveMaterial))}
+  host.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-hidden','true');renderer.domElement.addEventListener('webglcontextlost',lost)
+ }catch{
+  renderer?.dispose();renderer=undefined;simulated=false
+  canvas2d=document.createElement('canvas');canvas2d.setAttribute('aria-hidden','true');ctx2d=canvas2d.getContext('2d');host.appendChild(canvas2d);image=new Image();image.onload=()=>{if(!disposed)drawOnce()};image.src=oceanUrl
+ }
+ host.addEventListener('pointerdown',down);host.addEventListener('pointermove',move);host.addEventListener('pointerup',up);host.addEventListener('pointercancel',up);host.addEventListener('keydown',key);document.addEventListener('visibilitychange',visibility)
+ resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;resume()});observer.observe(host)
+ resize();resume();options.onReady?.();ripple(.56,.52,.65,false)
+ return{
+  ripple,pause(value){paused=value;resume();updateData()},quiet(value){quiet=value},enter(){entryTarget=1},reset(){entryTarget=0;entering=0;drawOnce()},
+  dispose(){disposed=true;stop();resizeObserver?.disconnect();observer?.disconnect();document.removeEventListener('visibilitychange',visibility);host.removeEventListener('pointerdown',down);host.removeEventListener('pointermove',move);host.removeEventListener('pointerup',up);host.removeEventListener('pointercancel',up);host.removeEventListener('keydown',key);renderer?.domElement.removeEventListener('webglcontextlost',lost);targetA?.dispose();targetB?.dispose();information.forEach(object=>{object.geometry.dispose();object.material.dispose()});owned.forEach(resource=>resource.dispose());if(image)image.onload=null;renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();activePointers.clear();drops=[]},
+ }
+}

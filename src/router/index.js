@@ -1,8 +1,9 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
+  { path: '/', redirect: '/portal' },
   {
-    path: '/',
+    path: '/portal',
     name: 'Home',
     component: () => import('../views/HomeView.vue'),
     meta: { icon: 'home', navKey: 'nav.home' },
@@ -10,6 +11,12 @@ const routes = [
   {
     path: '/scada',
     name: 'SCADA',
+    component: () => import('../views/DigitalTwinView.vue'),
+    meta: { standalone: true },
+  },
+  {
+    path: '/scada-classic',
+    name: 'ClassicSCADA',
     component: () => import('../views/ScadaView.vue'),
     meta: { icon: 'dashboard', navKey: 'nav.scada', badge: 'CONTROL INTERFACE' },
   },
@@ -17,24 +24,24 @@ const routes = [
     path: '/data-trend',
     name: 'DataTrend',
     component: () => import('../views/DataTrendView.vue'),
-    meta: { icon: 'show_chart', navKey: 'nav.dataTrend', badge: 'DATA TREND' },
+    meta: { ocean: true, icon: 'show_chart', navKey: 'nav.dataTrend', badge: 'DATA TREND' },
   },
   {
     path: '/alert-history',
     name: 'AlertHistory',
     component: () => import('../views/AlertHistoryView.vue'),
-    meta: { icon: 'notifications_active', navKey: 'nav.alertHistory', badge: 'ALERT HISTORY' },
+    meta: { ocean: true, icon: 'notifications_active', navKey: 'nav.alertHistory', badge: 'ALERT HISTORY' },
   },
   {
     path: '/report',
     name: 'Report',
     component: () => import('../views/ReportView.vue'),
-    meta: { icon: 'description', navKey: 'nav.report', badge: 'REPORT' },
+    meta: { ocean: true, icon: 'description', navKey: 'nav.report', badge: 'REPORT' },
   },
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes,
 })
 
