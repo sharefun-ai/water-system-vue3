@@ -93,7 +93,6 @@ float fallPosition(float t){
  if(t<${INTRO_IMPACT})return dropHermite(.55,1.,.15,1.04,(t-${INTRO_SLOW_END})/.80,.80);
  return 1.;
 }
-vec2 introOceanUv(vec2 uv,float aspect){float photoAspect=1.7768;if(aspect<photoAspect)uv.x=(uv.x-.5)*(aspect/photoAspect)+.58;else uv.y=(uv.y-.5)*(photoAspect/aspect)+.5;return clamp(uv,vec2(.005),vec2(.995));}
 vec3 sunEnvironment(vec3 ray){
  float sky=clamp(ray.y*.55+.55,0.,1.);vec3 color=mix(vec3(.035,.08,.11),vec3(.67,.79,.84),pow(sky,.65));
  vec3 sun=normalize(vec3(.53,.63,.57));float alignment=max(dot(ray,sun),0.);
@@ -125,7 +124,7 @@ vec3 opening(vec3 water,vec2 uv,float aspect,vec2 gradient,float height,vec2 sur
  float hy=texture2D(wordmark,glyphUv+vec2(0.,wordmarkTexel.y)).r-texture2D(wordmark,glyphUv-vec2(0.,wordmarkTexel.y)).r;
  vec3 letterNormal=normalize(vec3(-vec2(hx,hy)*2.5-gradient*1.4-surfaceSlope,.68));
  vec3 letterRefracted=refract(viewRay,letterNormal,1./1.333);
- vec3 letterWater=texture2D(ocean,introOceanUv(uv+letterRefracted.xy*.036,aspect)).rgb;
+ vec3 letterWater=calmWaterBelow(uv+letterRefracted.xy*.036/vec2(aspect,1.),aspect,ambientClock);
  float letterFresnel=.0204+.9796*pow(1.-max(letterNormal.z,0.),5.);
  vec3 letterReflection=sunEnvironment(reflect(viewRay,letterNormal));
  vec3 liquid=letterWater*.73+vec3(.055,.075,.08);
@@ -162,7 +161,7 @@ vec3 opening(vec3 water,vec2 uv,float aspect,vec2 gradient,float height,vec2 sur
  vec3 exitPoint=entryPoint+inside*((lower+upper)*.5),exitNormal=dropletNormal(exitPoint,radii,taper);
  vec3 through=refract(inside,-exitNormal,1.333);
  vec2 lensUv=uv+(exitPoint.xy-entryPoint.xy)/vec2(aspect,1.)+through.xy*.065;
- vec3 transmitted=texture2D(ocean,introOceanUv(lensUv,aspect)).rgb*1.08;
+ vec3 transmitted=calmWaterBelow(lensUv,aspect,ambientClock)*1.08;
  float transmittedLuma=dot(transmitted,vec3(.2126,.7152,.0722));transmitted=mix(transmitted,vec3(transmittedLuma)*vec3(.97,1.,1.02),.40);
  float fresnel=.0204+.9796*pow(1.-max(normal.z,0.),5.);
  vec3 glass=mix(transmitted,sunEnvironment(reflect(viewRay,normal)),fresnel);

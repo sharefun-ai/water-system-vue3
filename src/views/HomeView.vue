@@ -5,7 +5,6 @@ import TwinIcon from '../digital-twin/TwinIcon.vue'
 import { PROCESS_LINKS } from '../brand/processStory.js'
 import { createWaterSound } from '../brand/waterSound.js'
 import { claimWaterIntro } from '../brand/waterIntro.js'
-import ocean from '../assets/ocean-depth.webp'
 import './brand-home.css'
 
 const router=useRouter(),surface=ref(null),ready=ref(false),paused=ref(false),touched=ref(false),menuOpen=ref(false),entering=ref(''),audio=ref('waiting'),audioLevel=ref(0),voiceCount=ref(0)
@@ -34,7 +33,7 @@ onBeforeUnmount(()=>{disposed=true;clearTimeout(timer);water?.dispose();sound?.d
 </script>
 
 <template>
-  <main class="water-home" :class="{'is-ready':ready,'is-opening':opening,'is-touched':touched,'is-entering':!!entering}" :data-intro="opening?openingPhase:'complete'" :data-audio="audio" :data-audio-level="audioLevel.toFixed(6)" :data-audio-voices="voiceCount" :aria-busy="opening" aria-label="AQUATIC 互動水世界首頁" :style="{backgroundImage:`url(${ocean})`}">
+  <main class="water-home" :class="{'is-ready':ready,'is-opening':opening,'is-touched':touched,'is-entering':!!entering}" :data-intro="opening?openingPhase:'complete'" :data-audio="audio" :data-audio-level="audioLevel.toFixed(6)" :data-audio-voices="voiceCount" :aria-busy="opening" aria-label="AQUATIC 互動水世界首頁">
     <div ref="surface" class="water-surface" role="button" :tabindex="opening?-1:0" aria-label="觸碰水面：滑鼠點擊、拖曳或觸控可產生水波與藍色流光，第一次點擊啟動水聲旋律；也可按 Enter 或空白鍵。" />
     <div class="water-shade" aria-hidden="true" />
     <div v-if="opening" class="water-opening" role="status" aria-label="AQUATIC 開場：水滴落下，波紋沖散品牌字樣">

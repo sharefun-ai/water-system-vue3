@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import oceanUrl from '../assets/ocean-depth.webp'
+import { CALM_WATER_FRAGMENT, createCalmWaterPainter } from './calmWater.js'
 import { EQUIPMENT, PIPELINES } from '../digital-twin/topology.js'
 import { createIntroWordmark, dropFall, introDuration, INTRO_FRAGMENT, INTRO_DROP_START, INTRO_SLOW_START, INTRO_SLOW_END, INTRO_IMPACT } from './waterIntro.js'
 import { createWaterReadyGate } from './waterReadiness.js'
@@ -16,8 +16,9 @@ void main(){
  gl_FragColor=vec4(clamp(height,-1.5,1.5),previous.r,0.,1.);
 }`
 const WATER_FRAGMENT=`precision highp float;
-varying vec2 vUv;uniform sampler2D ocean;uniform sampler2D field;uniform vec2 resolution;uniform vec2 texel;
+varying vec2 vUv;uniform sampler2D field;uniform vec2 resolution;uniform vec2 texel;
 uniform float clock;uniform float ambientClock;uniform float simulated;uniform float energy;uniform float entering;uniform float waveSpeed;uniform vec4 touches[8];
+${CALM_WATER_FRAGMENT}
 ${INTRO_FRAGMENT}
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.)),f.x),f.y);}
@@ -26,18 +27,17 @@ void main(){
  float aspect=resolution.x/resolution.y;vec2 p=vUv*vec2(aspect,1.),grad=vec2(0.);float h=0.;
  if(simulated>.5){h=texture2D(field,vUv).r;grad=vec2(texture2D(field,vUv+vec2(texel.x,0.)).r-texture2D(field,vUv-vec2(texel.x,0.)).r,texture2D(field,vUv+vec2(0.,texel.y)).r-texture2D(field,vUv-vec2(0.,texel.y)).r)*2.7;}
  else{h=fallbackHeight(p);grad=vec2(fallbackHeight(p+vec2(.003,0.))-fallbackHeight(p-vec2(.003,0.)),fallbackHeight(p+vec2(0.,.003))-fallbackHeight(p-vec2(0.,.003)))*12.;}
- float t=ambientClock,a=dot(p,vec2(13.,8.))-t*.38,b=dot(p,vec2(-21.,17.))-t*.49,c=dot(p,vec2(37.,29.))-t*.71;
- vec2 surfaceSlope=cos(a)*vec2(.047,.029)+cos(b)*vec2(-.027,.022)+cos(c)*vec2(.018,.014),normalXY=grad+surfaceSlope;
- vec3 normal=normalize(vec3(-normalXY,1.));vec2 imageUv=vUv;float imageAspect=1.7768;
- if(aspect<imageAspect)imageUv.x=(vUv.x-.5)*(aspect/imageAspect)+.58;else imageUv.y=(vUv.y-.5)*(imageAspect/aspect)+.5;
- vec2 drift=vec2(sin(t*.065),cos(t*.051))*.009,refracted=clamp(imageUv+normalXY*.036+drift,vec2(.003),vec2(.997));
- vec3 photo=texture2D(ocean,refracted).rgb;float luminance=dot(photo,vec3(.2126,.7152,.0722));vec3 base=mix(photo,vec3(luminance)*vec3(.49,.85,1.12),.46)*.85+vec3(.005,.035,.055);
- float reflection=pow(max(dot(reflect(normalize(vec3(-.25,-.65,-1.5)),normal),vec3(0.,0.,1.)),0.),25.),silk=pow(max(dot(normal,normalize(vec3(-.13,.09,1.))),0.),90.);
- base+=vec3(.54,.78,.92)*reflection*.15+vec3(.10,.23,.31)*silk*.1;
+ float t=ambientClock;vec2 surfaceSlope;vec3 curvature;calmWaves(p-vec2(aspect*.5,.5),t,surfaceSlope,curvature);
+ vec2 normalXY=grad+surfaceSlope;vec3 normal=normalize(vec3(-normalXY,1.));
+ vec2 refracted=vUv+normalXY*.10/vec2(aspect,1.);
+ vec3 base=calmWaterBelow(refracted,aspect,t);
+ vec3 viewRay=vec3(0.,0.,-1.);float fresnel=.0204+.9796*pow(1.-normal.z,5.);
+ base=mix(base,calmWaterReflection(reflect(viewRay,normal)),fresnel+.14);
+ float silk=pow(max(dot(normal,normalize(vec3(-.04,.025,1.))),0.),180.);
+ base+=vec3(.16,.30,.33)*silk*.12;
  float response=0.,bloom=0.;
  for(int i=0;i<8;i++){float age=clock-touches[i].z;if(age<0.||age>11.)continue;float d=length(p-touches[i].xy),front=d-age*waveSpeed;float wave=exp(-front*front/.0038)*exp(-age*.31)*touches[i].w;float ripple=.5+.5*sin(front*68.+noise(p*13.)*.7);response+=wave*pow(ripple,5.);bloom+=exp(-d*d/.018)*exp(-age*1.6)*touches[i].w;}
- float caustic=pow(max(0.,1.-abs(sin(p.x*15.+sin(p.y*11.+t*.12)+normalXY.x*5.)+sin(p.y*18.+cos(p.x*12.-t*.1)+normalXY.y*5.))*.62),6.);
- float crest=min(.9,length(grad)*1.9);base+=vec3(.12,.58,.90)*(response*.23+crest*.18+bloom*.17);base+=vec3(.16,.54,.70)*caustic*(.021+energy*.07);
+ float crest=min(.9,length(grad)*1.9);base+=vec3(.12,.58,.90)*(response*.16+crest*.20+bloom*.12);
  float grain=hash(floor(refracted*resolution*.36));base+=vec3(.38,.75,.92)*pow(grain,80.)*response*.22;
  base*=1.-.22*pow(length((vUv-.5)*vec2(.8,1.)),1.3);base=opening(base,vUv,aspect,grad,h,surfaceSlope);base=mix(base,vec3(.015,.06,.095),entering*.85);gl_FragColor=vec4(base,1.);
 }`
@@ -51,16 +51,17 @@ const INFORMATION_FRAGMENT=`precision highp float;uniform float pointsMode;varyi
 
 export function createWaterField(host,options={}){
  let disposed=false,paused=false,quiet=!!options.quiet,visible=true,frame,previous=0,lastDraw=0,time=0,ambientTime=0,accumulator=0,frames=0,clicks=0,energy=0,entering=0,entryTarget=0,aspect=1
- let renderer,targetA,targetB,waveMaterial,waterMaterial,image,observer,resizeObserver,canvas2d,ctx2d,simWidth=1,simHeight=1,simulated=false,drops=[],lastHover=0,lastPoint
- let introActive=!!options.intro,introTime=0,introLength=7,introHit=false,introState='preparing',brandTexture,photoReady=false
+ let renderer,targetA,targetB,waveMaterial,waterMaterial,observer,resizeObserver,canvas2d,ctx2d,simWidth=1,simHeight=1,simulated=false,drops=[],lastHover=0,lastPoint
+ let introActive=!!options.intro,introTime=0,introLength=7,introHit=false,introState='preparing',brandTexture
  const readiness=createWaterReadyGate(()=>options.onReady?.())
  const activePointers=new Map(),touches=Array.from({length:8},()=>new THREE.Vector4(-10,-10,-100,0)),dropUniforms=Array.from({length:8},()=>new THREE.Vector4()),owned=[]
  const geometry=new THREE.PlaneGeometry(2,2),camera=new THREE.OrthographicCamera(-1,1,1,-1,0,1),scene=new THREE.Scene(),simScene=new THREE.Scene();owned.push(geometry)
- const photo=new THREE.TextureLoader().load(oceanUrl,()=>{if(!canvas2d){photoReady=true;readiness.assetReady();if(!disposed)drawOnce()}},undefined,()=>{if(!canvas2d){photoReady=true;readiness.assetReady()}});photo.colorSpace=THREE.NoColorSpace;owned.push(photo)
- const uniforms={ocean:{value:photo},field:{value:photo},resolution:{value:new THREE.Vector2(1,1)},texel:{value:new THREE.Vector2(1,1)},clock:{value:0},ambientClock:{value:0},simulated:{value:0},energy:{value:0},entering:{value:0},waveSpeed:{value:.23},touches:{value:touches},wordmark:{value:photo},wordmarkTexel:{value:new THREE.Vector2(1,1)},introEnabled:{value:introActive?1:0},introClock:{value:0},introDuration:{value:7},introCalm:{value:quiet?.35:1}}
+ const neutral=new THREE.DataTexture(new Uint8Array([0,0,0,0]),1,1,THREE.RGBAFormat);neutral.needsUpdate=true;owned.push(neutral)
+ const paintCalmWater=createCalmWaterPainter()
+ const uniforms={field:{value:neutral},resolution:{value:new THREE.Vector2(1,1)},texel:{value:new THREE.Vector2(1,1)},clock:{value:0},ambientClock:{value:0},simulated:{value:0},energy:{value:0},entering:{value:0},waveSpeed:{value:.23},touches:{value:touches},wordmark:{value:neutral},wordmarkTexel:{value:new THREE.Vector2(1,1)},introEnabled:{value:introActive?1:0},introClock:{value:0},introDuration:{value:7},introCalm:{value:quiet?.35:1}}
  let information=[]
- function updateData(){const canvas=renderer?.domElement||canvas2d;if(canvas)Object.assign(canvas.dataset,{renderer:renderer?simulated?'water-gpu-wave':'water-webgl-analytic':'water-canvas',ready:String(readiness.ready),frames:String(frames),time:time.toFixed(2),touches:String(clicks),motion:paused?'paused':'playing',energy:energy.toFixed(3),nodes:String(EQUIPMENT.length),branches:String(PIPELINES.length),intro:introActive?introState:'complete',introTime:introTime.toFixed(2)})}
- function finishIntro(){if(!introActive)return;introActive=false;uniforms.introEnabled.value=0;uniforms.wordmark.value=photo;brandTexture?.dispose();brandTexture=undefined;options.onIntroComplete?.();updateData()}
+ function updateData(){const canvas=renderer?.domElement||canvas2d;if(canvas)Object.assign(canvas.dataset,{renderer:renderer?simulated?'water-gpu-wave':'water-webgl-analytic':'water-canvas',surface:'procedural-calm-water',ready:String(readiness.ready),frames:String(frames),time:time.toFixed(2),ambientTime:ambientTime.toFixed(2),touches:String(clicks),motion:paused?'paused':'playing',energy:energy.toFixed(3),nodes:String(EQUIPMENT.length),branches:String(PIPELINES.length),intro:introActive?introState:'complete',introTime:introTime.toFixed(2)})}
+ function finishIntro(){if(!introActive)return;introActive=false;uniforms.introEnabled.value=0;uniforms.wordmark.value=neutral;brandTexture?.dispose();brandTexture=undefined;options.onIntroComplete?.();updateData()}
  function updateIntro(delta){
   if(!introActive||!readiness.ready)return
   introTime=Math.min(introLength,introTime+delta)
@@ -98,12 +99,11 @@ export function createWaterField(host,options={}){
   if(renderer){const ratio=Math.min(window.devicePixelRatio||1,width<768?1.25:1.5,Math.sqrt(1600000/(width*height)));renderer.setPixelRatio(ratio);renderer.setSize(width,height,false);uniforms.resolution.value.set(width*ratio,height*ratio);allocateSimulation();buildInformation()}
   else if(canvas2d){canvas2d.width=Math.floor(width);canvas2d.height=Math.floor(height)}
   if(introActive){brandTexture?.dispose();brandTexture=new THREE.CanvasTexture(createIntroWordmark(aspect));brandTexture.colorSpace=THREE.NoColorSpace;brandTexture.minFilter=THREE.LinearFilter;brandTexture.generateMipmaps=false;uniforms.wordmark.value=brandTexture;uniforms.wordmarkTexel.value.set(1/brandTexture.image.width,1/brandTexture.image.height);introLength=introDuration(aspect,uniforms.waveSpeed.value);uniforms.introDuration.value=introLength}
-  drawOnce()
+  readiness.assetReady();drawOnce()
  }
  function simulationStep(){waveMaterial.uniforms.state.value=targetA.texture;const count=Math.min(8,drops.length);for(let i=0;i<count;i++){const drop=drops.shift();dropUniforms[i].set(drop.x,drop.y,drop.radius,drop.strength)}waveMaterial.uniforms.dropCount.value=count;renderer.setRenderTarget(targetB);renderer.render(simScene,camera);renderer.setRenderTarget(null);const swap=targetA;targetA=targetB;targetB=swap;uniforms.field.value=targetA.texture}
  function drawCanvas(){
-  const w=canvas2d.width,h=canvas2d.height;ctx2d.fillStyle='#073343';ctx2d.fillRect(0,0,w,h)
-  if(image?.complete&&image.naturalWidth){const scale=Math.max(w/image.naturalWidth,h/image.naturalHeight)*1.04;ctx2d.drawImage(image,(w-image.naturalWidth*scale)/2+Math.sin(ambientTime*.07)*4,(h-image.naturalHeight*scale)/2+Math.cos(ambientTime*.06)*4,image.naturalWidth*scale,image.naturalHeight*scale);ctx2d.fillStyle='rgba(3,22,43,.22)';ctx2d.fillRect(0,0,w,h)}
+  const w=canvas2d.width,h=canvas2d.height;paintCalmWater(ctx2d,w,h,ambientTime)
   for(const touch of touches){const age=time-touch.z;if(age<0||age>10)continue;const x=touch.x/aspect*w,y=(1-touch.y)*h,r=Math.max(1,age*uniforms.waveSpeed.value*h),alpha=Math.exp(-age*.35)*touch.w;const halo=ctx2d.createRadialGradient(x,y,Math.max(0,r-24),x,y,r+24);halo.addColorStop(0,'rgba(100,210,255,0)');halo.addColorStop(.5,`rgba(100,210,255,${alpha*.24})`);halo.addColorStop(1,'rgba(100,210,255,0)');ctx2d.fillStyle=halo;ctx2d.fillRect(x-r-30,y-r-30,r*2+60,r*2+60);for(let i=0;i<3;i++){ctx2d.beginPath();ctx2d.arc(x,y,Math.max(1,r-i*12),0,Math.PI*2);ctx2d.strokeStyle=`rgba(156,223,255,${alpha*.19/(i+1)})`;ctx2d.lineWidth=1.4;ctx2d.stroke()}}
   if(introActive&&brandTexture){
    const age=Math.max(0,introTime-INTRO_IMPACT),radius=age*uniforms.waveSpeed.value*h
@@ -120,7 +120,7 @@ export function createWaterField(host,options={}){
    if(introTime>INTRO_DROP_START&&introTime<INTRO_IMPACT){const fall=dropFall(introTime),x=w/2,y=h*(-.025+.525*fall),radius=h*.024,stretch=1.5+.3*fall;const glass=ctx2d.createRadialGradient(x-radius*.3,y-radius*.35,0,x,y,radius*1.1);glass.addColorStop(0,'#f2f7e6d9');glass.addColorStop(.2,'#dceff580');glass.addColorStop(.7,'#40606b60');glass.addColorStop(1,'#bbd0d9b0');ctx2d.beginPath();ctx2d.moveTo(x,y-radius*stretch);ctx2d.bezierCurveTo(x+radius*.6,y-radius*stretch*.65,x+radius*1.2,y+radius*.5,x,y+radius*stretch);ctx2d.bezierCurveTo(x-radius*1.2,y+radius*.5,x-radius*.6,y-radius*stretch*.65,x,y-radius*stretch);ctx2d.fillStyle=glass;ctx2d.fill()}
   }
  }
- function drawOnce(){if(disposed)return;if(renderer){uniforms.clock.value=time;uniforms.ambientClock.value=ambientTime;uniforms.energy.value=energy;uniforms.entering.value=entering;renderer.render(scene,camera)}else if(ctx2d)drawCanvas();if(photoReady&&host.clientWidth&&host.clientHeight)readiness.frameRendered();frames++;updateData()}
+ function drawOnce(){if(disposed)return;if(renderer){uniforms.clock.value=time;uniforms.ambientClock.value=ambientTime;uniforms.energy.value=energy;uniforms.entering.value=entering;renderer.render(scene,camera)}else if(ctx2d)drawCanvas();if(host.clientWidth&&host.clientHeight)readiness.frameRendered();frames++;updateData()}
  function render(stamp){
   if(!canRun()){stop();return}frame=requestAnimationFrame(render);const interval=introActive?33:host.clientWidth<768||quiet?50:33;if(stamp-lastDraw<interval)return
   const delta=previous?Math.min(.07,(stamp-previous)/1000):0;previous=stamp;lastDraw=stamp;time+=delta;ambientTime+=delta*(quiet?.24:1);energy*=Math.exp(-delta*.5);entering+=(entryTarget-entering)*Math.min(1,delta*6)
@@ -149,13 +149,13 @@ export function createWaterField(host,options={}){
   host.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-hidden','true');renderer.domElement.addEventListener('webglcontextlost',lost)
  }catch{
   renderer?.dispose();renderer=undefined;simulated=false
-  canvas2d=document.createElement('canvas');canvas2d.setAttribute('aria-hidden','true');ctx2d=canvas2d.getContext('2d');host.appendChild(canvas2d);image=new Image();image.onload=()=>{photoReady=true;readiness.assetReady();if(!disposed)drawOnce()};image.onerror=()=>{photoReady=true;readiness.assetReady()};image.src=oceanUrl
+  canvas2d=document.createElement('canvas');canvas2d.setAttribute('aria-hidden','true');ctx2d=canvas2d.getContext('2d');host.appendChild(canvas2d)
  }
  host.addEventListener('pointerdown',down);host.addEventListener('pointermove',move);host.addEventListener('pointerup',up);host.addEventListener('pointercancel',up);host.addEventListener('keydown',key);document.addEventListener('visibilitychange',visibility)
  resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;resume()});observer.observe(host)
  resize();resume();if(!introActive)ripple(.56,.52,.65,false)
  return{
   ripple,skipIntro(){finishIntro();ripple(.5,.5,.65,false);drawOnce()},pause(value){paused=value;resume();updateData()},quiet(value){quiet=value;uniforms.introCalm.value=value?.35:1},enter(){entryTarget=1},reset(){entryTarget=0;entering=0;drawOnce()},
-  dispose(){disposed=true;readiness.dispose();stop();resizeObserver?.disconnect();observer?.disconnect();document.removeEventListener('visibilitychange',visibility);host.removeEventListener('pointerdown',down);host.removeEventListener('pointermove',move);host.removeEventListener('pointerup',up);host.removeEventListener('pointercancel',up);host.removeEventListener('keydown',key);renderer?.domElement.removeEventListener('webglcontextlost',lost);targetA?.dispose();targetB?.dispose();brandTexture?.dispose();information.forEach(object=>{object.geometry.dispose();object.material.dispose()});owned.forEach(resource=>resource.dispose());if(image){image.onload=null;image.onerror=null}renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();activePointers.clear();drops=[]},
+  dispose(){disposed=true;readiness.dispose();stop();resizeObserver?.disconnect();observer?.disconnect();document.removeEventListener('visibilitychange',visibility);host.removeEventListener('pointerdown',down);host.removeEventListener('pointermove',move);host.removeEventListener('pointerup',up);host.removeEventListener('pointercancel',up);host.removeEventListener('keydown',key);renderer?.domElement.removeEventListener('webglcontextlost',lost);targetA?.dispose();targetB?.dispose();brandTexture?.dispose();information.forEach(object=>{object.geometry.dispose();object.material.dispose()});owned.forEach(resource=>resource.dispose());renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();activePointers.clear();drops=[]},
  }
 }

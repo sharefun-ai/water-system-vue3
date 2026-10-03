@@ -1,5 +1,5 @@
-// A downloaded image is not yet a presented frame. Keep the opening clock at
-// zero until the ocean and wordmark have actually passed through the renderer.
+// Prepared resources are not yet a presented frame. Keep the opening clock at
+// zero until the water material and wordmark have passed through the renderer.
 export function createWaterReadyGate(onReady) {
   let assetsReady = false, ready = false, active = true
   return {
