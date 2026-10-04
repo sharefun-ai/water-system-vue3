@@ -12,7 +12,7 @@ import {ANALOG,DIGITAL,signalById,formatSignal,isWarning} from '../digital-twin/
 import {DIAGRAM} from '../digital-twin/schematic'
 import {EQUIPMENT,equipmentById,CIRCUITS} from '../digital-twin/topology'
 import {captureScene} from '../digital-twin/captureScene'
-import {placeAnnotations} from '../digital-twin/annotations'
+import {placeAnnotations,valueAnnotations} from '../digital-twin/annotations'
 import '../digital-twin/twin.css'
 import '../digital-twin/annotations.css'
 
@@ -20,11 +20,15 @@ const telemetry=useTelemetry()
 const route=useRoute(),router=useRouter()
 const {mode,values,receivedAt,error,missing,usable,status}=telemetry
 const canvasHost=ref(null),viewport=ref(null),schematicView=ref(null),sourceDialog=ref(null),selectedId=ref('T02'),cameraView=ref('iso')
-const cutaway=ref(true),motion=ref(true),allTags=ref(true),reference=ref(route.query.view==='2d'),panelTab=ref('metrics'),inspectorOpen=ref(false),immersive=ref(false),search=ref('')
+const cutaway=ref(true),motion=ref(true),overlayMode=ref('labels'),reference=ref(route.query.view==='2d'),panelTab=ref('metrics'),inspectorOpen=ref(false),immersive=ref(false),search=ref('')
+const allTags=computed({get:()=>overlayMode.value==='labels',set:checked=>{if(checked)overlayMode.value='labels';else if(allTags.value)overlayMode.value='none'}})
+const showValues=computed({get:()=>overlayMode.value==='values',set:checked=>{if(checked)overlayMode.value='values';else if(showValues.value)overlayMode.value='none'}})
 const sceneReady=ref(false),sceneError=ref(''),exporting=ref(false),exportError=ref(''),sourceChoice=ref('api'),apiUrl=ref(telemetry.endpoint.value),dialogError=ref(''),savedArtifact=ref(null)
 let scene
-const labels=shallowRef([])
-function updateLabels(projected){labels.value=placeAnnotations(projected,canvasHost.value.clientWidth,canvasHost.value.clientHeight,selectedId.value,labels.value)}
+const labels=shallowRef([]),projectedLabels=shallowRef([])
+function layoutLabels(){if(!canvasHost.value)return;const {clientWidth:w,clientHeight:h}=canvasHost.value,p=projectedLabels.value;labels.value=overlayMode.value==='none'?[]:placeAnnotations(showValues.value?valueAnnotations(p,w,h):p,w,h,selectedId.value,labels.value,p.filter(l=>l.visible&&l.body).map(l=>l.body))}
+function updateLabels(projected){projectedLabels.value=projected;layoutLabels()}
+watch(overlayMode,()=>{labels.value=[];layoutLabels()})
 const selected=computed(()=>equipmentById[selectedId.value])
 const analogSelected=computed(()=>selected.value.signals.map(id=>signalById[id]).filter(s=>ANALOG.includes(s)))
 const digitalSelected=computed(()=>selected.value.signals.map(id=>signalById[id]).filter(s=>DIGITAL.includes(s)))
@@ -47,10 +51,10 @@ async function saveArtifact(blob,kind,name){
 async function exportModel(){exporting.value=true;exportError.value='';try{if(reference.value)await saveArtifact(schematicView.value.exportSvg(),'svg2d','aquatic-scada-2d.svg');else await saveArtifact(await scene.exportModel(),'glb','aquatic-scada-3d.glb')}catch(e){exportError.value=`匯出失敗：${e.message}`}finally{exporting.value=false}}
 async function saveScene(){try{await saveArtifact(await captureScene(reference.value?schematicView.value:scene,values.value,{width:reference.value?DIAGRAM.width:canvasHost.value.clientWidth,height:reference.value?DIAGRAM.height:canvasHost.value.clientHeight,selectedId:selectedId.value,status:status.value,labels:reference.value?[]:labels.value}),reference.value?'png2d':'png',reference.value?'aquatic-scada-2d.png':'aquatic-scada-scene.png')}catch(e){exportError.value=`圖片儲存失敗：${e.message}`}}
 function escape(event){if(event.key==='Escape'){inspectorOpen.value=false;immersive.value=false;reference.value=false}}
-watch([values,usable,cutaway,motion,allTags],()=>scene?.update(values.value,{usable:usable.value,cutaway:cutaway.value,motion:motion.value,allTags:allTags.value}))
+watch([values,usable,cutaway,motion,overlayMode],()=>scene?.update(values.value,{usable:usable.value,cutaway:cutaway.value,motion:motion.value,allTags:overlayMode.value!=='none'}))
 watch(reference,active=>{scene?.setVisible(!active);router.replace({query:{...route.query,view:active?'2d':undefined}})})
 watch(()=>route.query.view,view=>reference.value=view==='2d')
-onMounted(()=>{window.addEventListener('keydown',escape);try{scene=createPlantScene(canvasHost.value,{onSelect:id=>select(id),onLabels:updateLabels,onReady:()=>sceneReady.value=true,onError:message=>sceneError.value=message});scene.update(values.value,{usable:usable.value,cutaway:cutaway.value,motion:motion.value,allTags:allTags.value});scene.select(selectedId.value);scene.setVisible(!reference.value)}catch(e){sceneError.value=`無法啟用 3D 顯示：${e.message}`}})
+onMounted(()=>{window.addEventListener('keydown',escape);try{scene=createPlantScene(canvasHost.value,{onSelect:id=>select(id),onLabels:updateLabels,onReady:()=>sceneReady.value=true,onError:message=>sceneError.value=message});scene.update(values.value,{usable:usable.value,cutaway:cutaway.value,motion:motion.value,allTags:overlayMode.value!=='none'});scene.select(selectedId.value);scene.setVisible(!reference.value)}catch(e){sceneError.value=`無法啟用 3D 顯示：${e.message}`}})
 onBeforeUnmount(()=>{window.removeEventListener('keydown',escape);scene?.dispose()})
 </script>
 
@@ -65,14 +69,15 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',escape);scene?.dispose
           <div class="process-toolbar"><div class="process-title"><TwinIcon :name="reference?'layers':'cube'" :size="18"/><h2>製程全景</h2><span class="scene-count">35 元件</span></div><div class="toolbar-actions"><div class="view-selector" aria-label="顯示模式"><button v-for="v in [{id:'iso',label:'立體'},{id:'top',label:'俯視'},{id:'front',label:'正視'}]" :key="v.id" :class="{'is-active':!reference&&cameraView===v.id}" @click="setView(v.id)">{{v.label}}</button><button :class="{'is-active':reference}" :aria-pressed="reference" @click="reference=true">2D 圖控</button></div><button class="panel-toggle" @click="showPanel('metrics')"><TwinIcon name="pressure" :size="16"/>儀表</button><button class="panel-toggle" @click="showPanel('equipment')"><TwinIcon name="layers" :size="16"/>設備</button><button v-if="immersive" class="icon-button" aria-label="離開專注圖控" @click="immersive=false"><TwinIcon name="close"/></button></div></div>
           <div ref="viewport" class="twin-viewport">
             <div ref="canvasHost" class="twin-canvas"/>
-            <div v-if="!reference" class="equipment-labels" aria-label="設備名稱標籤">
+            <div v-if="!reference&&overlayMode!=='none'" class="equipment-labels" :aria-label="showValues?'圖上即時數值':'設備名稱標籤'" :data-overlay-mode="overlayMode">
               <svg class="label-leaders" aria-hidden="true"><g v-for="l in labels" :key="l.id" :class="{'is-selected':selectedId===l.id}" :style="{'--label-color':CIRCUITS[l.circuit].color}"><path :d="`M ${l.ax} ${l.ay} L ${l.ex} ${l.ey}`"/><circle :cx="l.ax" :cy="l.ay" :r="selectedId===l.id?3:2"/></g></svg>
-              <button v-for="l in labels" :key="l.id" class="equipment-label" :class="{'is-selected':selectedId===l.id}" :style="{transform:`translate3d(${l.x}px,${l.y}px,0)`,width:l.w+'px',height:l.h+'px','--label-color':CIRCUITS[l.circuit].color,'--label-font':l.font+'px','--tag-font':l.tagFont+'px'}" :aria-label="`選取 ${equipmentById[l.id].name}`" @click="select(l.id)"><b>{{l.tag}}</b><span v-if="l.name">{{l.name}}</span></button>
+              <template v-if="showValues"><button v-for="l in labels" :key="l.id" class="equipment-reading" :class="{'is-selected':selectedId===l.id,'is-compact':l.w<160,'is-warning':l.signalIds.some(id=>isWarning(id,values[id]))}" :style="{transform:`translate3d(${l.x}px,${l.y}px,0)`,width:l.w+'px',height:l.h+'px','--label-color':CIRCUITS[l.circuit].color}" :aria-label="`${l.tag} ${l.name}，${l.signalIds.map(id=>formatSignal(id,values[id])+' '+signalById[id].unit).join('，')}`" :data-equipment-id="l.id" @click="select(l.id)"><span class="reading-title"><b>{{l.tag}}</b>{{l.name}}</span><span class="reading-primary" :class="{'is-warning':isWarning(l.signalIds[0],values[l.signalIds[0]])}"><strong :data-signal-id="l.signalIds[0]">{{formatSignal(l.signalIds[0],values[l.signalIds[0]])}}</strong><small>{{signalById[l.signalIds[0]].unit}}</small></span><span v-if="l.signalIds[1]" class="reading-total"><span>累計</span><strong :data-signal-id="l.signalIds[1]">{{formatSignal(l.signalIds[1],values[l.signalIds[1]])}}</strong><small>{{signalById[l.signalIds[1]].unit}}</small></span></button></template>
+              <template v-else><button v-for="l in labels" :key="l.id" class="equipment-label" :class="{'is-selected':selectedId===l.id}" :style="{transform:`translate3d(${l.x}px,${l.y}px,0)`,width:l.w+'px',height:l.h+'px','--label-color':CIRCUITS[l.circuit].color,'--label-font':l.font+'px','--tag-font':l.tagFont+'px'}" :aria-label="`選取 ${equipmentById[l.id].name}`" @click="select(l.id)"><b>{{l.tag}}</b><span v-if="l.name">{{l.name}}</span></button></template>
             </div>
             <div v-if="!reference" class="viewport-topline"><span>3D 狀態燈 <i/> 管線流向示意</span></div>
             <div v-if="!reference&&!sceneReady&&!sceneError" class="scene-loading"><TwinIcon name="cube" :size="32"/>正在建立 3D 製程模型…</div>
             <div v-if="!reference&&sceneError" class="scene-error" role="alert">{{sceneError}}</div>
-            <SchematicView v-if="reference" ref="schematicView" :values="values" :selected-id="selectedId" :motion="motion" :all-tags="allTags" :cutaway="cutaway" :usable="usable" :status="status" @select="select($event)"/>
+            <SchematicView v-if="reference" ref="schematicView" :values="values" :selected-id="selectedId" :motion="motion" :all-tags="allTags" :show-values="showValues" :cutaway="cutaway" :usable="usable" :status="status" @select="select($event)"/>
             <div class="viewport-tools"><button class="icon-button" aria-label="放大" @click="zoomScene(1.18)"><TwinIcon name="plus"/></button><button class="icon-button" aria-label="縮小" @click="zoomScene(.85)"><TwinIcon name="minus"/></button><button class="icon-button" aria-label="重設視角" @click="resetView"><TwinIcon name="reset"/></button><button class="icon-button" :aria-label="reference?'切換 3D 圖控':'切換 2D 圖控'" :aria-pressed="reference" @click="reference=!reference"><TwinIcon name="layers"/></button><button class="icon-button" aria-label="儲存場景圖片" @click="saveScene"><TwinIcon name="camera"/></button></div>
             <span v-if="!reference" class="orbit-hint">拖曳旋轉 · 雙指縮放 · 點選設備</span>
           </div>
@@ -82,7 +87,7 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',escape);scene?.dispose
           </section>
           <div class="scene-legend"><div class="circuit-legend"><span v-for="c in CIRCUITS" :key="c.name" :style="{'--circuit-color':c.color}"><i/>{{c.name}}</span></div><span class="lamp-legend"><SignalLamp :value="1" size="small"/>亮燈<SignalLamp :value="0" size="small"/>熄燈<SignalLamp :value="null" size="small"/>未知</span></div>
         </section>
-        <div class="scene-settings"><label><input type="checkbox" v-model="cutaway"/>槽體透視</label><label><input type="checkbox" v-model="motion"/>動畫效果</label><label><input type="checkbox" v-model="allTags"/>設備標籤</label><span>{{44-missing}} / 44 訊號</span></div>
+        <div class="scene-settings"><label><input type="checkbox" v-model="cutaway"/>槽體透視</label><label><input type="checkbox" v-model="motion"/>動畫效果</label><fieldset class="scene-display-options" aria-label="圖上顯示，設備標籤與數值互斥"><label><input type="checkbox" v-model="allTags"/>設備標籤</label><label><input type="checkbox" v-model="showValues"/>顯示數值</label></fieldset><span>{{44-missing}} / 44 訊號</span></div>
         <div v-if="error||exportError" class="data-error" role="alert">{{error||exportError}}</div><p v-if="savedArtifact" class="saved-artifact" role="status">已儲存：<a :href="savedArtifact.href" :download="savedArtifact.name">{{savedArtifact.name}}</a></p>
       </main>
       <button v-if="inspectorOpen" class="drawer-scrim" aria-label="關閉儀表面板" @click="inspectorOpen=false"/>

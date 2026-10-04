@@ -7,7 +7,7 @@ import {signalById,formatSignal,isWarning,lineIsActive} from './telemetry'
 import schematicStyles from './schematic.css?raw'
 import './schematic.css'
 
-const props=defineProps({values:Object,selectedId:String,motion:Boolean,allTags:Boolean,cutaway:Boolean,usable:Boolean,status:String})
+const props=defineProps({values:Object,selectedId:String,motion:Boolean,allTags:Boolean,showValues:Boolean,cutaway:Boolean,usable:Boolean,status:String})
 const emit=defineEmits(['select'])
 const surface=ref(null),svg=ref(null),scale=ref(1),center=ref([DIAGRAM.width/2,DIAGRAM.height/2]),dragging=ref(false)
 const box=computed(()=>({x:center.value[0]-DIAGRAM.width/2/scale.value,y:center.value[1]-DIAGRAM.height/2/scale.value,w:DIAGRAM.width/scale.value,h:DIAGRAM.height/scale.value}))
@@ -64,17 +64,17 @@ defineExpose({zoom,reset,focus,screenshot,exportSvg})
       <g v-for="(joint,i) in junctions" :key="i" :transform="`translate(${joint.point.join(' ')})`"><circle r="6.5" fill="#132836" stroke="#91aebe" stroke-width="2"/><circle r="2.5" :fill="joint.color"/></g>
       <g class="s2-external-ports"><text x="1385" y="40" class="s2-name">廢水放流系統</text><path d="M 1390 65 V 55 M 1384 61 L 1390 55 L 1396 61" stroke="#a7c2d0" stroke-width="2" fill="none"/><text x="55" y="395" class="s2-small">回收水貯槽</text><text x="85" y="720" class="s2-name">研磨廢水</text><path d="M 130 734 L 138 740 L 130 746" fill="none" stroke="#7ccaff" stroke-width="2"/></g>
       <g v-for="e in diagramEquipment.filter(e=>e.type!=='instrument')" :key="e.id" role="button" tabindex="0" :data-equipment="e.id" :aria-label="`2D 選取 ${e.name}`" @keydown.enter="emit('select',e.id)" @keydown.space.prevent="emit('select',e.id)">
-        <SchematicEquipment :equipment="e" :values="values" :selected="e.id===selectedId" :show-label="allTags" :cutaway="cutaway"/>
+        <SchematicEquipment :equipment="e" :values="values" :selected="e.id===selectedId" :show-label="allTags" :show-values="showValues" :cutaway="cutaway"/>
         <rect :transform="`translate(${e.point.join(' ')})`" :x="deviceBounds(e)[0]" :y="deviceBounds(e)[1]" :width="deviceBounds(e)[2]" :height="deviceBounds(e)[3]" fill="transparent" class="s2-hit-target"/>
       </g>
       <g v-for="e in instruments" :key="e.id" class="s2-instrument" role="button" tabindex="0" :data-equipment="e.id" :aria-label="`2D 選取 ${signalById[e.signalId].label}`" @keydown.enter="emit('select',e.id)" @keydown.space.prevent="emit('select',e.id)">
         <g :transform="`translate(${e.point.join(' ')}) rotate(${e.dialRotation})`"><path d="M 0 0 V -23" stroke="#b2cbd8" stroke-width="4"/><circle cy="-28" r="21" fill="url(#s2-metal)" stroke="#a7c2cd" stroke-width="1.5"/><circle cy="-28" r="16" fill="#e1ecf0" stroke="#5c7c90"/><path d="M -11 -23 L -9 -23 M -8 -36 L -6 -34 M 0 -40 V -37 M 8 -36 L 6 -34 M 11 -23 H 9" stroke="#385468" stroke-width="1.4"/><path v-if="values[e.signalId]!==null&&values[e.signalId]!==undefined" d="M 0 -28 V -40" :transform="`rotate(${dialAngle(e)} 0 -28)`" stroke="#1c596d" stroke-width="2"/><circle cy="-28" r="2.5" fill="#315970"/></g>
-        <path :d="meterLeader(e)" fill="none" :stroke="CIRCUITS[e.circuit].color" stroke-width="1" opacity=".55"/>
-        <g class="s2-meter" :class="{'is-selected':selectedId===e.id,'is-warning':isWarning(e.signalId,values[e.signalId])}" :transform="`translate(${meterPositions[e.id].join(' ')})`">
-          <rect width="178" :height="meterHeight(e)" rx="7" fill="#122b39" :stroke="selectedId===e.id?'#9deacc':isWarning(e.signalId,values[e.signalId])?'#b58b60':'#4b6d83'" stroke-width="1.5"/>
+        <path v-if="allTags||showValues" :d="meterLeader(e,showValues?meterHeight(e):32)" fill="none" :stroke="CIRCUITS[e.circuit].color" stroke-width="1" opacity=".55"/>
+        <g v-if="allTags||showValues" class="s2-meter" :class="{'is-selected':selectedId===e.id,'is-warning':showValues&&isWarning(e.signalId,values[e.signalId])}" :transform="`translate(${meterPositions[e.id].join(' ')})`">
+          <rect width="178" :height="showValues?meterHeight(e):32" rx="7" fill="#122b39" :stroke="selectedId===e.id?'#9deacc':showValues&&isWarning(e.signalId,values[e.signalId])?'#b58b60':'#4b6d83'" stroke-width="1.5"/>
           <text x="11" y="20" class="s2-meter-title">{{e.tag}} · {{signalById[e.signalId].label}}</text>
-          <text x="11" y="51" class="s2-value" :fill="isWarning(e.signalId,values[e.signalId])?'#f0bb82':'#9ee9ce'" :data-signal-id="e.signalId">{{formatSignal(e.signalId,values[e.signalId])}}</text><text x="165" y="49" text-anchor="end" class="s2-unit">{{signalById[e.signalId].unit}}</text>
-          <g v-if="e.signals.length>1"><path d="M 11 62 H 167" stroke="#3b596c"/><text x="11" y="82" class="s2-small">累計</text><text x="167" y="83" text-anchor="end" class="s2-total" :data-signal-id="e.signals[1]">{{formatSignal(e.signals[1],values[e.signals[1]])}} m³</text></g>
+          <g v-if="showValues"><text x="11" y="51" class="s2-value" :fill="isWarning(e.signalId,values[e.signalId])?'#f0bb82':'#9ee9ce'" :data-signal-id="e.signalId">{{formatSignal(e.signalId,values[e.signalId])}}</text><text x="165" y="49" text-anchor="end" class="s2-unit">{{signalById[e.signalId].unit}}</text>
+          <g v-if="e.signals.length>1"><path d="M 11 62 H 167" stroke="#3b596c"/><text x="11" y="82" class="s2-small">累計</text><text x="167" y="83" text-anchor="end" class="s2-total" :data-signal-id="e.signals[1]">{{formatSignal(e.signals[1],values[e.signals[1]])}} m³</text></g></g>
         </g>
       </g>
     </svg>

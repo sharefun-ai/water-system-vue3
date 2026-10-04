@@ -5,7 +5,7 @@ import {CIRCUITS} from './topology'
 import {levelFraction} from './display'
 import {localPorts,deviceBounds} from './schematic'
 import {formatSignal,signalById,isWarning} from './telemetry'
-const props=defineProps({equipment:Object,values:Object,selected:Boolean,showLabel:Boolean,cutaway:Boolean})
+const props=defineProps({equipment:Object,values:Object,selected:Boolean,showLabel:Boolean,showValues:Boolean,cutaway:Boolean})
 const e=computed(()=>props.equipment),color=computed(()=>CIRCUITS[e.value.circuit].color)
 const level=computed(()=>levelFraction(props.values[e.value.levelId],e.value.visualRange||[0,1]))
 const levelIds=computed(()=>e.value.signals.slice(1))
@@ -35,7 +35,7 @@ const bounds=computed(()=>deviceBounds(e.value)),ports=computed(()=>localPorts(e
       <rect x="53" y="-73" width="29" height="140" rx="6" fill="url(#s2-dark-metal)" stroke="#5f7a8e"/>
       <g v-for="(id,i) in levelIds" :key="id" :transform="`translate(67,${-57+i*27})`"><SvgSignalLamp :signal-id="id" :value="values[id]" :label="signalById[id].name"/><text x="-26" y="5" text-anchor="end" class="s2-level-code">{{levelNames[id]}}</text></g>
       <rect x="-29" y="-24" width="58" height="27" rx="3" fill="#152c38" stroke="#688493"/><text y="-6" text-anchor="middle" class="s2-tag">{{e.tag}}</text>
-      <g v-if="showLabel||selected"><text y="124" text-anchor="middle" class="s2-name">{{e.name}}</text><rect x="-80" y="135" width="160" height="43" rx="7" fill="#132b36" stroke="#517687"/><text x="-66" y="162" class="s2-value" :fill="color" :data-signal-id="e.levelId">{{formatSignal(e.levelId,values[e.levelId])}}<tspan dx="8" class="s2-unit">cm</tspan></text><text x="64" y="161" text-anchor="end" class="s2-small">液位</text></g>
+      <text v-if="showLabel" y="124" text-anchor="middle" class="s2-name">{{e.name}}</text><g v-if="showValues"><rect x="-80" y="135" width="160" height="43" rx="7" fill="#132b36" stroke="#517687"/><text x="-66" y="162" class="s2-value" :fill="isWarning(e.levelId,values[e.levelId])?'#f0bb82':color" :data-signal-id="e.levelId">{{formatSignal(e.levelId,values[e.levelId])}}<tspan dx="8" class="s2-unit">cm</tspan></text><text x="64" y="161" text-anchor="end" class="s2-small">液位</text></g>
     </g>
     <g v-else-if="e.type==='chemicalTank'" class="s2-cast-shadow">
       <ellipse cy="56" rx="42" ry="8" fill="#030b13" opacity=".6"/>
@@ -47,7 +47,7 @@ const bounds=computed(()=>deviceBounds(e.value)),ports=computed(()=>localPorts(e
       <rect x="-24" y="-13" width="48" height="27" rx="3" fill="#26314a" stroke="#8098ad"/><text y="5" text-anchor="middle" class="s2-tag">{{e.tag}}</text>
       <path d="M -8 27 H 8" stroke="#d0ad68" stroke-width="5"/>
       <g data-port="outlet"><path d="M 36 25 H 45" stroke="#b1c7d2" stroke-width="7"/><use href="#s2-flange" transform="translate(45 25)"/></g>
-      <text v-if="showLabel||selected" y="81" text-anchor="middle" class="s2-name">{{e.name}}</text>
+      <text v-if="showLabel" y="81" text-anchor="middle" class="s2-name">{{e.name}}</text>
     </g>
     <g v-else-if="e.type==='pump'" class="s2-cast-shadow">
       <g :transform="e.mirrored?'scale(-1 1)':''">
@@ -65,12 +65,12 @@ const bounds=computed(()=>deviceBounds(e.value)),ports=computed(()=>localPorts(e
       <g data-port="outlet"><path d="M 32 -29 V -38" stroke="#b1c7d2" stroke-width="7"/><use href="#s2-flange" transform="translate(32 -38) rotate(90)"/></g>
       </g>
       <SvgSignalLamp :transform="`translate(${e.mirrored?16:-16} -43)`" :signal-id="e.signalId" :value="values[e.signalId]" :label="e.name"/>
-      <g v-if="showLabel||selected"><text y="44" text-anchor="middle" class="s2-tag" :fill="color">{{e.tag}}</text><text y="65" text-anchor="middle" class="s2-name">{{e.name}}</text></g>
+      <g v-if="showLabel"><text y="44" text-anchor="middle" class="s2-tag" :fill="color">{{e.tag}}</text><text y="65" text-anchor="middle" class="s2-name">{{e.name}}</text></g>
     </g>
     <g v-else-if="e.type==='valve'">
       <g :transform="e.vertical?'rotate(90)':''"><path d="M -26 -7 V 7 M 26 -7 V 7" stroke="#b9cbd5" stroke-width="5"/><path d="M -23 -12 L 0 0 L -23 12 Z M 23 -12 L 0 0 L 23 12 Z" fill="url(#s2-metal)" stroke="#7b9aaa" stroke-width="1.5"/><circle r="5" fill="#264453" stroke="#a1baca"/></g>
-      <g v-if="e.vertical"><path d="M 4 0 H 24" stroke="#c0d4de" stroke-width="3"/><rect x="22" y="-8" width="16" height="16" rx="3" fill="url(#s2-dark-metal)" stroke="#869ead"/><SvgSignalLamp transform="translate(46 -16)" :signal-id="e.signalId" :value="values[e.signalId]" :label="e.name"/><text v-if="showLabel||selected" x="-38" y="5" text-anchor="end" class="s2-tag" :fill="color">{{e.tag}}</text></g>
-      <g v-else><path d="M 0 -4 V -23" stroke="#c0d4de" stroke-width="3"/><rect x="-15" y="-31" width="30" height="16" rx="3" fill="url(#s2-dark-metal)" stroke="#869ead"/><SvgSignalLamp transform="translate(0 -48)" :signal-id="e.signalId" :value="values[e.signalId]" :label="e.name"/><text v-if="showLabel||selected" x="38" y="5" class="s2-tag" :fill="color">{{e.tag}}</text></g>
+      <g v-if="e.vertical"><path d="M 4 0 H 24" stroke="#c0d4de" stroke-width="3"/><rect x="22" y="-8" width="16" height="16" rx="3" fill="url(#s2-dark-metal)" stroke="#869ead"/><SvgSignalLamp transform="translate(46 -16)" :signal-id="e.signalId" :value="values[e.signalId]" :label="e.name"/><text v-if="showLabel" x="-38" y="5" text-anchor="end" class="s2-tag" :fill="color">{{e.tag}}</text></g>
+      <g v-else><path d="M 0 -4 V -23" stroke="#c0d4de" stroke-width="3"/><rect x="-15" y="-31" width="30" height="16" rx="3" fill="url(#s2-dark-metal)" stroke="#869ead"/><SvgSignalLamp transform="translate(0 -48)" :signal-id="e.signalId" :value="values[e.signalId]" :label="e.name"/><text v-if="showLabel" x="38" y="5" class="s2-tag" :fill="color">{{e.tag}}</text></g>
     </g>
     <g v-else-if="e.type==='membrane'" class="s2-cast-shadow">
       <ellipse cy="150" rx="82" ry="8" fill="#030b13" opacity=".7"/>
@@ -79,7 +79,7 @@ const bounds=computed(()=>deviceBounds(e.value)),ports=computed(()=>localPorts(e
       <g v-for="(p,name) in ports" :key="name" :data-port="name"><path :d="`M 0 ${name==='feed'?134:-134} V ${p[1]}`" stroke="#bdd2de" stroke-width="7"/><use href="#s2-flange" :transform="`translate(${p.join(' ')}) rotate(90)`"/></g>
       <g v-for="i in 6" :key="i" :transform="`translate(${-59+(i-1)*23.5} 0)`"><rect x="-9" y="-117" width="18" height="233" rx="9" fill="url(#s2-metal)" stroke="#6a899b"/><path d="M -9 -108 H 9 M -9 107 H 9" stroke="#1a3346" stroke-width="6"/><path d="M -3 -133 V -117 M -3 117 V 134" stroke="#c4d7df" stroke-width="7"/><path d="M -8 -7 H 8" stroke="#95aebb" stroke-width="2"/></g>
       <rect x="-55" y="-21" width="110" height="42" rx="4" fill="#203b4c" stroke="#718a9c"/><text y="-3" text-anchor="middle" class="s2-tag">UF-01</text><text y="14" text-anchor="middle" class="s2-small">ULTRAFILTRATION</text>
-      <text v-if="showLabel||selected" y="177" text-anchor="middle" class="s2-name">超濾膜組</text>
+      <text v-if="showLabel" y="177" text-anchor="middle" class="s2-name">超濾膜組</text>
     </g>
   </g>
 </template>

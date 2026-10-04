@@ -97,9 +97,9 @@ export function bridgePath(line,others){
 export const renderedLines=diagramLines.map(line=>({...line,d:bridgePath(line,diagramLines)}))
 export const meterPositions={I101:[1170,840],I102:[1660,940],I103:[1770,835],I104:[1720,190],I106:[920,1040],I107:[250,815],I108:[385,138],I112:[820,40],I113:[1080,40]}
 export const meterHeight=e=>e.signals.length>1?92:68
-export function meterLeader(e){
+export function meterLeader(e,height=meterHeight(e)){
   const angle=e.dialRotation*Math.PI/180,anchor=[e.point[0]+50*Math.sin(angle),e.point[1]-50*Math.cos(angle)],p=meterPositions[e.id]
-  const target=[Math.max(p[0],Math.min(p[0]+178,anchor[0])),Math.max(p[1],Math.min(p[1]+meterHeight(e),anchor[1]))]
+  const target=[Math.max(p[0],Math.min(p[0]+178,anchor[0])),Math.max(p[1],Math.min(p[1]+height,anchor[1]))]
   return 'M '+anchor.join(' ')+' L '+target.join(' ')
 }
 export const portConnections=diagramEquipment.flatMap(e=>Object.entries(localPorts(e)).map(([name,offset])=>({id:e.id,name,offset,point:P(e.id,name)})))

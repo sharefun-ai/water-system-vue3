@@ -12,3 +12,24 @@
 .twin-app.has-motion .equipment-label.is-selected{animation:annotation-breathe 3s ease-in-out infinite}
 @keyframes annotation-breathe{0%,100%{box-shadow:0 2px 7px #0005,0 0 7px #8ae3ba18}50%{box-shadow:0 2px 7px #0005,0 0 13px #8ae3ba48}}
 .viewport-tools{z-index:3}.viewport-topline,.orbit-hint{z-index:3}
+.twin-app .equipment-reading{position:absolute;left:0;top:0;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:7px 9px;pointer-events:auto;text-align:left;white-space:nowrap;background:#122431f5;border:1px solid #526f83;border-radius:7px;box-shadow:0 2px 8px #0005;color:#e0eff7;overflow:hidden}
+.equipment-reading .reading-title{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:10px;line-height:13px;color:#b7ceda}
+.reading-title b{font:600 10px 'Space Grotesk',monospace;color:var(--label-color);flex-shrink:0}
+.reading-primary{display:flex;align-items:baseline;justify-content:space-between;gap:5px;line-height:27px}
+.reading-primary strong{font:600 25px/1 'Space Grotesk',monospace;color:#a1e9d1;font-variant-numeric:tabular-nums}
+.reading-primary small{font-size:9px;color:#aec6d4}
+.reading-primary.is-warning strong{color:#efbb85}
+.reading-total{display:flex;align-items:baseline;gap:5px;border-top:1px solid #3b5667;padding-top:4px;font-size:9px;line-height:13px;color:#aec6d4}
+.reading-total strong{margin-left:auto;font:500 12px 'Space Grotesk',monospace;color:#d0e6ed;font-variant-numeric:tabular-nums}
+.reading-total small{font-size:8px}
+.twin-app .equipment-reading:hover{background:#1d3840;border-color:#8abbb0}
+.twin-app .equipment-reading.is-warning{border-color:#96765a}
+.twin-app .equipment-reading.is-selected{border-color:#a0e9ce;background:#193830;box-shadow:0 0 10px #8ae3ba32}
+.twin-app .equipment-reading.is-compact{gap:2px;padding:5px 7px}
+.equipment-reading.is-compact .reading-title{font-size:9px;line-height:12px}
+.equipment-reading.is-compact .reading-title b{font-size:9px}
+.equipment-reading.is-compact .reading-primary{line-height:23px}
+.equipment-reading.is-compact .reading-primary strong{font-size:22px}
+.equipment-reading.is-compact .reading-primary small{font-size:8px}
+.equipment-reading.is-compact .reading-total{padding-top:3px;line-height:12px}
+.equipment-reading.is-compact .reading-total strong{font-size:11px}

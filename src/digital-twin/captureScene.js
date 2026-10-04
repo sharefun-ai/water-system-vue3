@@ -12,7 +12,19 @@ export async function captureScene(scene,values,{width,height,selectedId,status,
   c.save();c.translate(0,head+(h-height)/2)
   for(const l of labels){c.strokeStyle=CIRCUITS[l.circuit].color;c.globalAlpha=l.id===selectedId?.9:.6;c.lineWidth=l.id===selectedId?1.4:1;c.beginPath();c.moveTo(l.ax,l.ay);c.lineTo(l.ex,l.ey);c.stroke();c.beginPath();c.arc(l.ax,l.ay,l.id===selectedId?3:2,0,Math.PI*2);c.fillStyle=CIRCUITS[l.circuit].color;c.fill()}
   c.globalAlpha=1
-  for(const l of labels){const active=l.id===selectedId;c.fillStyle=active?'#193830':'#122431';c.strokeStyle=active?'#a0e9ce':'#5c7b8e';c.lineWidth=1;c.beginPath();c.roundRect(l.x,l.y,l.w,l.h,6);c.fill();c.stroke();c.font=`600 ${l.tagFont}px monospace`;c.fillStyle=CIRCUITS[l.circuit].color;c.fillText(l.tag,l.x+9,l.y+l.h/2+4);const tagWidth=c.measureText(l.tag).width;if(l.name)text(l.name,l.x+18+tagWidth,l.y+l.h/2+4,l.font,'#e0eff7')}
+  for(const l of labels){
+    const active=l.id===selectedId;c.fillStyle=active?'#193830':'#122431';c.strokeStyle=active?'#a0e9ce':'#5c7b8e';c.lineWidth=1;c.beginPath();c.roundRect(l.x,l.y,l.w,l.h,6);c.fill();c.stroke()
+    if(l.signalIds){
+      const compact=l.w<160,id=l.signalIds[0],secondary=l.signalIds[1],left=l.x+8
+      c.font='600 10px monospace';c.fillStyle=CIRCUITS[l.circuit].color;c.fillText(l.tag,left,l.y+14)
+      text(l.name,left+c.measureText(l.tag).width+6,l.y+14,compact?9:10)
+      text(formatSignal(id,values[id]),left,l.y+(compact?36:42),compact?22:25,isWarning(id,values[id])?'#efbb85':'#a1e9d1')
+      c.textAlign='right';text(signalById[id].unit,l.x+l.w-8,l.y+(compact?36:42),compact?8:9);c.textAlign='left'
+      if(secondary){c.strokeStyle='#3b5667';c.beginPath();c.moveTo(left,l.y+l.h-23);c.lineTo(l.x+l.w-8,l.y+l.h-23);c.stroke();text('累計',left,l.y+l.h-9,9);c.textAlign='right';text(`${formatSignal(secondary,values[secondary])} ${signalById[secondary].unit}`,l.x+l.w-8,l.y+l.h-9,compact?10:11);c.textAlign='left'}
+    }else{
+      c.font=`600 ${l.tagFont}px monospace`;c.fillStyle=CIRCUITS[l.circuit].color;c.fillText(l.tag,l.x+9,l.y+l.h/2+4);const tagWidth=c.measureText(l.tag).width;if(l.name)text(l.name,l.x+18+tagWidth,l.y+l.h/2+4,l.font,'#e0eff7')
+    }
+  }
   c.restore()
   c.fillStyle='#142431';c.fillRect(width,head,side,h);c.strokeStyle='#385566';c.beginPath();c.moveTo(width,head);c.lineTo(width,head+h);c.stroke()
   let y=head+28
