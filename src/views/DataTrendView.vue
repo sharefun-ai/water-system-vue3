@@ -99,7 +99,7 @@ function signed(value) { return value === null ? '—' : `${value > 0 ? '+' : ''
 function exportCsv() {
   const blob = new Blob([trendCsv(trend.value, selectedDate.value, category.value.unit)], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob), link = document.createElement('a')
-  link.href = url; link.download = `AQUATIC_${category.value.api}_${selectedDate.value}.csv`
+  link.href = url; link.download = `AQUATEC_${category.value.api}_${selectedDate.value}.csv`
   document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 function escape(event) {
@@ -214,7 +214,7 @@ onBeforeUnmount(() => { disposed = true; initialized = false; requestNumber++; c
         <summary><span><TwinIcon name="report" :size="17" />逐時數據紀錄 <small>{{ initialLoading ? '讀取中' : `${trend.count} 筆` }}</small></span><TwinIcon name="chevron" :size="16" /></summary>
         <div class="trend-table-wrap"><table><caption>{{ selectedDate }} {{ category.label }}，單位 {{ category.unit }}</caption><thead><tr><th scope="col">時間</th><th v-for="item in trend.series" :key="item.id" scope="col">{{ item.tag }} · {{ item.title }}</th></tr></thead><tbody><tr v-for="(hour, index) in trend.hours" :key="hour"><th scope="row">{{ hour }}</th><td v-for="item in trend.series" :key="item.id">{{ fmt(item.data[index]) }}</td></tr></tbody></table></div>
       </details>
-      <footer class="trend-page-footer"><span><TwinIcon name="drop" :size="13" /> AQUATIC · PROCESS INTELLIGENCE</span><span>歷史資料依既有測點記錄呈現</span></footer>
+      <footer class="trend-page-footer"><span><TwinIcon name="drop" :size="13" /> AQUATEC · PROCESS INTELLIGENCE</span><span>歷史資料依既有測點記錄呈現</span></footer>
     </div>
   </div>
 </template>

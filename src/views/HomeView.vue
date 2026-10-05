@@ -32,14 +32,14 @@ onBeforeUnmount(()=>{disposed=true;clearTimeout(timer);water?.dispose();sound?.d
 </script>
 
 <template>
-  <main class="water-home" :class="{'is-ready':ready,'is-opening':opening,'is-touched':touched,'is-entering':!!entering}" :data-intro="opening?openingPhase:'complete'" :data-audio="audio" :data-audio-level="audioLevel.toFixed(6)" :data-audio-voices="voiceCount" :aria-busy="opening" aria-label="AQUATIC 互動水世界首頁">
+  <main class="water-home" :class="{'is-ready':ready,'is-opening':opening,'is-touched':touched,'is-entering':!!entering}" :data-intro="opening?openingPhase:'complete'" :data-audio="audio" :data-audio-level="audioLevel.toFixed(6)" :data-audio-voices="voiceCount" :aria-busy="opening" aria-label="AQUATEC 互動水世界首頁">
     <div ref="surface" class="water-surface" role="button" :tabindex="opening?-1:0" aria-label="觸碰水面：滑鼠點擊、拖曳或觸控可產生水波與藍色流光，第一次點擊啟動水聲旋律；也可按 Enter 或空白鍵。" />
     <div class="water-shade" aria-hidden="true" />
-    <div v-if="opening" class="water-opening" role="status" aria-label="AQUATIC 開場：水滴落下，波紋沖散品牌字樣">
-      <button class="water-opening-skip" aria-label="略過 AQUATIC 開場動畫" @click="skipOpening"><span>略過</span><TwinIcon name="arrow" :size="16" /></button>
+    <div v-if="opening" class="water-opening" role="status" aria-label="AQUATEC 開場：水滴落下，波紋沖散品牌字樣">
+      <button class="water-opening-skip" aria-label="略過 AQUATEC 開場動畫" @click="skipOpening"><span>略過</span><TwinIcon name="arrow" :size="16" /></button>
     </div>
     <header class="water-topbar" :inert="opening">
-      <router-link to="/portal" class="water-logo" aria-label="AQUATIC 品牌首頁"><TwinIcon name="drop" :size="26"/><strong>AQUATIC<span>.</span></strong></router-link>
+      <router-link to="/portal" class="water-logo" aria-label="AQUATEC 品牌首頁"><TwinIcon name="drop" :size="26"/><strong>AQUATEC<span>.</span></strong></router-link>
       <div class="water-menu-area">
         <button class="water-icon" aria-label="開啟功能選單" :aria-expanded="menuOpen" aria-controls="water-menu" @click="menuOpen=!menuOpen"><TwinIcon :name="menuOpen?'close':'layers'" :size="21" /></button>
         <nav v-if="menuOpen" id="water-menu" class="water-menu" aria-label="功能選單"><a v-for="item in PROCESS_LINKS" :key="item.to" :href="`#${item.to}`" @click.prevent="enter(item)"><TwinIcon :name="item.icon" :size="19"/><span>{{item.name}}</span><TwinIcon name="arrow" :size="16"/></a></nav>

@@ -19,9 +19,9 @@ onBeforeUnmount(() => { document.removeEventListener('keydown', dismiss); docume
 
 <template>
   <header class="twin-header aquatic-header">
-    <router-link to="/portal" class="twin-brand" aria-label="AQUATIC 品牌首頁">
+    <router-link to="/portal" class="twin-brand" aria-label="AQUATEC 品牌首頁">
       <span class="brand-mark"><TwinIcon name="drop" :size="23" /></span>
-      <span><strong>AQUATIC<span class="brand-dot">.</span></strong><small>PROCESS INTELLIGENCE</small></span>
+      <span><strong>AQUATEC<span class="brand-dot">.</span></strong><small>PROCESS INTELLIGENCE</small></span>
     </router-link>
     <nav class="header-nav" aria-label="主導覽">
       <router-link v-for="item in navigation.slice(0, 5)" :key="item.to" :to="item.to" :class="{ 'is-current': route.path === item.to }" :aria-current="route.path === item.to ? 'page' : undefined">{{ item.name }}</router-link>

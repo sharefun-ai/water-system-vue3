@@ -42,7 +42,7 @@ export function createPlantScene(host,{onSelect,onLabels=()=>{},onReady,onError,
   sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-25,right:25,top:20,bottom:-20,near:.5,far:80});sun.shadow.bias=-.0015
   scene.add(sun)
   const rim=new THREE.DirectionalLight('#7ecbd9',2);rim.position.set(13,8,-14);scene.add(rim)
-  const plant=new THREE.Group();plant.name='Aquatic_SCADA_3D';scene.add(plant)
+  const plant=new THREE.Group();plant.name='Aquatec_SCADA_3D';scene.add(plant)
   const mats={
     steel:new THREE.MeshStandardMaterial({color:'#b7c5d0',metalness:.82,roughness:.28}),
     dark:new THREE.MeshStandardMaterial({color:'#1b2a37',metalness:.68,roughness:.45}),

@@ -18,7 +18,7 @@ function toggleLocale() {
     <div class="flex items-center gap-2 sm:gap-3 min-w-0">
       <router-link to="/" class="flex items-center gap-1.5 sm:gap-2 no-underline shrink-0">
         <span class="material-symbols-outlined text-primary text-lg sm:text-xl" style="font-variation-settings: 'FILL' 1">water_drop</span>
-        <span class="text-xs sm:text-sm font-black tracking-wider text-primary font-label">AQUATIC_SCADA</span>
+        <span class="text-xs sm:text-sm font-black tracking-wider text-primary font-label">AQUATEC_SCADA</span>
       </router-link>
       <template v-if="route.meta.badge">
         <span class="hidden sm:inline text-on-surface-variant/30">/</span>

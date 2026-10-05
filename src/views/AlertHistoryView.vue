@@ -21,7 +21,7 @@ const hours=Array.from({length:24},(_,hour)=>hour)
 const header=inject('setAquaticStatus',()=>{})
 watch(()=>[loading.value,error.value,coverage.value.affected,historical.value],()=>header({label:loading.value?'資料讀取中':error.value?'資料讀取失敗':historical.value?'歷史記錄':coverage.value.affected?'有缺測記錄':'資料完整',tone:loading.value?'neutral':error.value||coverage.value.affected||historical.value?'warning':'connected'}),{immediate:true})
 watch(period,()=>{selected.value=null})
-function download(){const csv=toCsv([['日期','時段','測點','設備','狀態'],...filtered.value.map(m=>[m.date,m.time,m.tag,m.title,'資料缺測'])]);const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download=`AQUATIC_缺測紀錄_${period.value}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
+function download(){const csv=toCsv([['日期','時段','測點','設備','狀態'],...filtered.value.map(m=>[m.date,m.time,m.tag,m.title,'資料缺測'])]);const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download=`AQUATEC_缺測紀錄_${period.value}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
 </script>
 
 <template>
@@ -50,7 +50,7 @@ function download(){const csv=toCsv([['日期','時段','測點','設備','狀�
           <footer class="trend-chart-footer"><span><TwinIcon name="info" :size="13"/>這裡呈現資料缺測；設備超限狀態請參考圖控儀表。</span><span>{{receivedAt?`資料讀取 ${receivedAt}`:'等待資料'}}</span></footer>
         </div>
       </section>
-      <footer class="trend-page-footer"><span><TwinIcon name="drop" :size="13"/>AQUATIC · PROCESS INTELLIGENCE</span><span>完整率以有效量測記錄計算</span></footer>
+      <footer class="trend-page-footer"><span><TwinIcon name="drop" :size="13"/>AQUATEC · PROCESS INTELLIGENCE</span><span>完整率以有效量測記錄計算</span></footer>
     </div>
   </div>
 </template>

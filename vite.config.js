@@ -13,7 +13,7 @@ function localArtifacts() {
         if (req.method !== 'POST') return next()
         if (req.headers.origin !== 'http://' + req.headers.host) { res.statusCode = 403; res.end('Same-origin export required'); return }
         const kind = new URL(req.url, 'http://localhost').searchParams.get('kind')
-        const file = ({glb:'models/aquatic-scada-3d.glb',png:'docs/screenshots/aquatic-scada-scene.png',png2d:'docs/screenshots/aquatic-scada-2d.png',svg2d:'models/aquatic-scada-2d.svg'})[kind] || null
+        const file = ({glb:'models/aquatec-scada-3d.glb',png:'docs/screenshots/aquatec-scada-scene.png',png2d:'docs/screenshots/aquatec-scada-2d.png',svg2d:'models/aquatec-scada-2d.svg'})[kind] || null
         if (!file) { res.statusCode = 400; res.end('Unsupported artifact'); return }
         try {
           const chunks = []; let size = 0

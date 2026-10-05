@@ -7,7 +7,7 @@ export async function captureScene(scene,values,{width,height,selectedId,status,
   canvas.width=(width+side)*2;canvas.height=(h+head+foot)*2
   const c=canvas.getContext('2d');c.scale(2,2);c.fillStyle='#0b131e';c.fillRect(0,0,width+side,h+head+foot)
   const text=(str,x,y,size=11,color='#bfd4e2')=>{c.font=`${size>=18?'600':'500'} ${size}px "Noto Sans TC",sans-serif`;c.fillStyle=color;c.fillText(str,x,y)}
-  text('AQUATIC · 水系統數位圖控',18,32,18,'#b1efd7');text(status+' · 管線流向示意',width+12,30,10)
+  text('AQUATEC · 水系統數位圖控',18,32,18,'#b1efd7');text(status+' · 管線流向示意',width+12,30,10)
   c.drawImage(image,0,head+(h-height)/2,width,height)
   c.save();c.translate(0,head+(h-height)/2)
   for(const l of labels){c.strokeStyle=CIRCUITS[l.circuit].color;c.globalAlpha=l.id===selectedId?.9:.6;c.lineWidth=l.id===selectedId?1.4:1;c.beginPath();c.moveTo(l.ax,l.ay);c.lineTo(l.ex,l.ey);c.stroke();c.beginPath();c.arc(l.ax,l.ay,l.id===selectedId?3:2,0,Math.PI*2);c.fillStyle=CIRCUITS[l.circuit].color;c.fill()}

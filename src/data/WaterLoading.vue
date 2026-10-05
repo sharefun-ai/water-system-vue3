@@ -17,7 +17,7 @@ const id = useId().replaceAll(':', ''), clip = `${id}-water-clip`, gradient = `$
         <circle cx="80" cy="16" r="2.2" fill="#b3f5dc" class="water-glint" />
       </svg>
     </div>
-    <div class="water-loading-copy"><p v-if="!compact" class="water-loading-kicker">AQUATIC / WATER INTELLIGENCE</p><h3>{{ title }}</h3><p v-if="detail && !compact" class="water-loading-detail">{{ detail }}</p><span v-if="!compact" class="water-loading-hint">{{ slow ? '資料仍在讀取中，請稍候…' : '讓每一筆水的變化，逐漸清晰。' }}<i /><i /><i /></span></div>
+    <div class="water-loading-copy"><p v-if="!compact" class="water-loading-kicker">AQUATEC / WATER INTELLIGENCE</p><h3>{{ title }}</h3><p v-if="detail && !compact" class="water-loading-detail">{{ detail }}</p><span v-if="!compact" class="water-loading-hint">{{ slow ? '資料仍在讀取中，請稍候…' : '讓每一筆水的變化，逐漸清晰。' }}<i /><i /><i /></span></div>
   </div>
 </template>
 

@@ -30,7 +30,7 @@ const LETTERS = [
   { width: 70, path: 'M 3 2 L 3 56 C 3 77 14 88 35 88 C 56 88 67 77 67 56 L 67 2' },
   { width: 70, path: 'M 2 88 L 35 2 L 68 88 M 15 56 L 55 56' },
   { width: 66, path: 'M 2 2 L 64 2 M 33 2 L 33 88' },
-  { width: 12, path: 'M 6 2 L 6 88' },
+  { width: 66, path: 'M 63 2 L 3 2 L 3 88 L 63 88 M 3 45 L 52 45' },
   { width: 70, path: 'M 66 15 C 58 6 49 2 35 2 C 15 2 3 19 3 45 C 3 71 15 88 35 88 C 49 88 59 83 67 75' },
 ]
 let letterOffset = 0

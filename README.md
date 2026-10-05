@@ -69,7 +69,7 @@ npm run build
 
 ## 3.5 共用導覽與數據趨勢
 
-- `src/components/AquaticHeader.vue`、`AquaticRail.vue` 與 `navigation.js` 共用同一套 AQUATIC 品牌、五個模組、所在頁提示與手機選單。3D、2D、趨勢、警報、報表及傳統圖控沿用相同導覽。
+- `src/components/AquaticHeader.vue`、`AquaticRail.vue` 與 `navigation.js` 共用同一套 AQUATEC 品牌、五個模組、所在頁提示與手機選單。3D、2D、趨勢、警報、報表及傳統圖控沿用相同導覽。
 - 數據趨勢頁重新設計為海洋背景、七類測點篩選、單一測點統計、逐時趨勢、多曲線開關、測點摘要與可展開資料表。統計不混合不同測點。
 - `src/assets/ocean-depth.webp` 是內建 imagegen 生成的自然海洋背景，搭配柔和光影；裝飾尊重減少動態效果設定。提示詞與生成資訊在 `docs/ocean-background-prompt.md`。
 - 移除趨勢頁強制隨機模擬數據，讀取既有 `/水系統3.0/backend/search_chart_3.php`。JSON POST 保持 `{activeButton, today_date}`；累計水量用每小時末筆，其餘沿用後端每小時平均。
