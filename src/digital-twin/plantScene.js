@@ -5,6 +5,7 @@ import {CIRCUITS,EQUIPMENT,PIPELINES} from './topology'
 import {lineIsActive,isWarning,signalById} from './telemetry'
 import {levelFraction,flowPhase} from './display'
 import {lampAppearance} from './lamps'
+import {fitSceneFrame} from './framing'
 
 const V=(p)=>new THREE.Vector3(...p)
 // Rounded orthogonal elbows, rather than splines that overshoot corners.
@@ -242,11 +243,20 @@ export function createPlantScene(host,{onSelect,onLabels=()=>{},onReady,onError,
   if(!manual){renderer.domElement.addEventListener('pointerdown',pointerDown);renderer.domElement.addEventListener('pointerup',pointerUp);renderer.domElement.addEventListener('pointermove',pointerMove)}
   const contextLost=e=>{e.preventDefault();onError('3D 顯示連線中斷，請重新載入；仍可查看右側數據。')}
   renderer.domElement.addEventListener('webglcontextlost',contextLost)
-  function resize(){const w=host.clientWidth,h=host.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);const half=Math.max(13.4,19*h/w);camera.left=-half*w/h;camera.right=half*w/h;camera.top=half;camera.bottom=-half;camera.updateProjectionMatrix()}
+  const framingPoints=[...[-17,17].flatMap(x=>[-11,11].map(z=>new THREE.Vector3(x,0,z))),...labels.flatMap(l=>l.corners.length?l.corners:[l.position])]
+  const framingTarget=new THREE.Vector3(0,1,0)
+  let frameRight=0,frameBottom=0,targetRight=0,targetBottom=0,needsFrame=false
+  function frameCamera(){
+    const w=host.clientWidth,h=host.clientHeight;if(!w||!h)return
+    if(manual){const half=Math.max(13.4,19*h/w);Object.assign(camera,{left:-half*w/h,right:half*w/h,top:half,bottom:-half})}
+    else{const rotation=camera.quaternion.clone().invert(),projected=framingPoints.map(p=>{const q=p.clone().sub(framingTarget).applyQuaternion(rotation);return[q.x,q.y]});Object.assign(camera,fitSceneFrame(w,h,projected,{right:frameRight,bottom:frameBottom}))}
+    camera.updateProjectionMatrix()
+  }
+  function resize(){const w=host.clientWidth,h=host.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);frameCamera()}
   const observer=new ResizeObserver(resize);observer.observe(host);resize()
   const desiredPosition=new THREE.Vector3(),desiredTarget=new THREE.Vector3();let transition=false
-  function setView(next){view=next;desiredTarget.set(0,1,0);desiredPosition.copy(next==='top'?new THREE.Vector3(0,50,.01):next==='front'?new THREE.Vector3(0,17,48):new THREE.Vector3(25,32,36));transition=true;camera.zoom=1;camera.updateProjectionMatrix()}
-  function focus(id){const e=equipment.get(id);if(!e)return;desiredTarget.copy(e.group.position).add(new THREE.Vector3(0,1.3,0));desiredPosition.copy(desiredTarget).add(new THREE.Vector3(14,18,20));transition=true;camera.zoom=1.7;camera.updateProjectionMatrix()}
+  function setView(next){view=next;desiredTarget.set(0,1,0);desiredPosition.copy(next==='top'?new THREE.Vector3(0,50,.01):next==='front'?new THREE.Vector3(0,17,48):new THREE.Vector3(25,32,36));transition=true;needsFrame=true;camera.zoom=1;camera.updateProjectionMatrix()}
+  function focus(id){const e=equipment.get(id);if(!e)return;desiredTarget.copy(e.group.position).add(new THREE.Vector3(0,1.3,0));desiredPosition.copy(desiredTarget).add(new THREE.Vector3(14,18,20));transition=true;camera.zoom=Math.min(host.clientWidth,host.clientHeight)<500?2.8:1.7;camera.updateProjectionMatrix()}
   function select(id){
     for(const h of highlighted){h.mesh.material=h.original;h.overlay.dispose();materials.delete(h.overlay)}highlighted.length=0
     selected=id;const e=equipment.get(id);halo.visible=haloOuter.visible=glow.visible=!!e
@@ -272,6 +282,8 @@ export function createPlantScene(host,{onSelect,onLabels=()=>{},onReady,onError,
     if(transition&&reduceMotion){camera.position.copy(desiredPosition);controls.target.copy(desiredTarget);transition=false}
     if(transition){camera.position.lerp(desiredPosition,.1);controls.target.lerp(desiredTarget,.1);if(camera.position.distanceTo(desiredPosition)<.04)transition=false}
     controls.update()
+    if(Math.abs(frameRight-targetRight)>.5||Math.abs(frameBottom-targetBottom)>.5){frameRight=reduceMotion?targetRight:THREE.MathUtils.lerp(frameRight,targetRight,.12);frameBottom=reduceMotion?targetBottom:THREE.MathUtils.lerp(frameBottom,targetBottom,.12);frameCamera()}
+    else if(frameRight!==targetRight||frameBottom!==targetBottom||needsFrame&&!transition){frameRight=targetRight;frameBottom=targetBottom;frameCamera();if(!transition)needsFrame=false}
     for(const e of equipment.values()){
       const def=e.definition,value=currentValues[def.signalId],warn=def.signals.some(id=>isWarning(id,currentValues[id]))
       if(e.stateLamp)updateLamp(e.stateLamp,value)
@@ -301,7 +313,7 @@ export function createPlantScene(host,{onSelect,onLabels=()=>{},onReady,onError,
     renderer.render(scene,camera)
     if(time-lastLabelTime>33){
       lastLabelTime=time;const w=host.clientWidth,h=host.clientHeight
-      const key=[...camera.position.toArray(),...camera.quaternion.toArray(),camera.zoom,w,h,selected,allTags].join(',')
+      const key=[...camera.position.toArray(),...camera.quaternion.toArray(),camera.zoom,camera.left,camera.top,w,h,selected,allTags].join(',')
       if(key!==lastLabelKey){lastLabelKey=key;onLabels(labels.map(l=>{
         const p=l.position.clone().project(camera),points=l.corners.map(c=>{const q=c.clone().project(camera);return [(q.x+1)*w/2,(1-q.y)*h/2]})
         const body=points.length?{x:Math.min(...points.map(c=>c[0])),y:Math.min(...points.map(c=>c[1])),w:Math.max(...points.map(c=>c[0]))-Math.min(...points.map(c=>c[0])),h:Math.max(...points.map(c=>c[1]))-Math.min(...points.map(c=>c[1]))}:null
@@ -313,6 +325,7 @@ export function createPlantScene(host,{onSelect,onLabels=()=>{},onReady,onError,
   if(!manual)frameId=requestAnimationFrame(render);onReady?.({equipment:EQUIPMENT.length,pipes:PIPELINES.length})
   return {
     update,setView,focus,select,
+    setWorkspaceInsets({right=0,bottom=0}={}){targetRight=right;targetBottom=bottom},
     // The homepage shares the exact SCADA geometry and topology with its own film clock.
     presentation:manual?{scene,renderer,camera,plant,equipment,pipes,mats,grid,indicators}:null,
     setVisible(visible){sceneVisible=visible},

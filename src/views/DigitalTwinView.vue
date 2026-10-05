@@ -1,5 +1,5 @@
 <script setup>
-import {ref,shallowRef,computed,onMounted,onBeforeUnmount,watch} from 'vue'
+import {ref,shallowRef,computed,onMounted,onBeforeUnmount,watch,nextTick} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import TwinIcon from '../digital-twin/TwinIcon.vue'
 import AquaticHeader from '../components/AquaticHeader.vue'
@@ -15,20 +15,34 @@ import {captureScene} from '../digital-twin/captureScene'
 import {placeAnnotations,valueAnnotations} from '../digital-twin/annotations'
 import '../digital-twin/twin.css'
 import '../digital-twin/annotations.css'
+import '../digital-twin/workspace.css'
 
 const telemetry=useTelemetry()
 const route=useRoute(),router=useRouter()
 const {mode,values,receivedAt,error,missing,usable,status}=telemetry
 const canvasHost=ref(null),viewport=ref(null),schematicView=ref(null),sourceDialog=ref(null),selectedId=ref('T02'),cameraView=ref('iso')
-const cutaway=ref(true),motion=ref(true),overlayMode=ref('labels'),reference=ref(route.query.view==='2d'),panelTab=ref('metrics'),inspectorOpen=ref(false),immersive=ref(false),search=ref('')
+const phoneViewport=()=>window.matchMedia('(max-width:767px), (max-width:1100px) and (max-height:600px)').matches
+const cutaway=ref(true),motion=ref(true),overlayMode=ref(phoneViewport()?'none':'labels'),reference=ref(route.query.view==='2d'),panelTab=ref('metrics'),inspectorOpen=ref(false),immersive=ref(false),search=ref('')
 const allTags=computed({get:()=>overlayMode.value==='labels',set:checked=>{if(checked)overlayMode.value='labels';else if(allTags.value)overlayMode.value='none'}})
 const showValues=computed({get:()=>overlayMode.value==='values',set:checked=>{if(checked)overlayMode.value='values';else if(showValues.value)overlayMode.value='none'}})
 const sceneReady=ref(false),sceneError=ref(''),exporting=ref(false),exportError=ref(''),sourceChoice=ref('api'),apiUrl=ref(telemetry.endpoint.value),dialogError=ref(''),savedArtifact=ref(null)
-let scene
+let scene,compactViewport,workspaceObserver
 const labels=shallowRef([]),projectedLabels=shallowRef([])
-function layoutLabels(){if(!canvasHost.value)return;const {clientWidth:w,clientHeight:h}=canvasHost.value,p=projectedLabels.value;labels.value=overlayMode.value==='none'?[]:placeAnnotations(showValues.value?valueAnnotations(p,w,h):p,w,h,selectedId.value,labels.value,p.filter(l=>l.visible&&l.body).map(l=>l.body))}
+function workspaceObstacles(){
+  if(!viewport.value)return []
+  const area=viewport.value.getBoundingClientRect()
+  return [...viewport.value.closest('.twin-shell').querySelectorAll('.selection-dock,.viewport-tools,.twin-inspector.is-open')].map(el=>{const r=el.getBoundingClientRect();return{x:r.left-area.left-6,y:r.top-area.top-6,w:r.width+12,h:r.height+12}}).filter(r=>r.w>12&&r.h>12&&r.x<area.width&&r.y<area.height&&r.x+r.w>0&&r.y+r.h>0)
+}
+function layoutLabels(){if(!canvasHost.value)return;const {clientWidth:w,clientHeight:h}=canvasHost.value,p=projectedLabels.value;labels.value=overlayMode.value==='none'?[]:placeAnnotations(showValues.value?valueAnnotations(p,w,h):p,w,h,selectedId.value,labels.value,p.filter(l=>l.visible&&l.body).map(l=>l.body),workspaceObstacles())}
+function updateWorkspace(){
+  if(!viewport.value)return
+  const bounds=viewport.value.getBoundingClientRect(),panel=viewport.value.closest('.twin-shell').querySelector('.twin-inspector')
+  scene?.setWorkspaceInsets({right:inspectorOpen.value&&bounds.width>=720?panel.getBoundingClientRect().width+30:0,bottom:12})
+  labels.value=[];layoutLabels()
+}
 function updateLabels(projected){projectedLabels.value=projected;layoutLabels()}
-watch(overlayMode,()=>{labels.value=[];layoutLabels()})
+watch(overlayMode,next=>{if(next!=='none'&&phoneViewport()){if(reference.value)schematicView.value?.reset();else scene?.setView(cameraView.value)}labels.value=[];layoutLabels()})
+watch([inspectorOpen,immersive,selectedId],()=>nextTick(updateWorkspace))
 const selected=computed(()=>equipmentById[selectedId.value])
 const analogSelected=computed(()=>selected.value.signals.map(id=>signalById[id]).filter(s=>ANALOG.includes(s)))
 const digitalSelected=computed(()=>selected.value.signals.map(id=>signalById[id]).filter(s=>DIGITAL.includes(s)))
@@ -41,7 +55,7 @@ function focusSelected(id=selectedId.value){if(reference.value)schematicView.val
 function zoomScene(factor){if(reference.value)schematicView.value?.zoom(factor);else scene?.zoom(factor)}
 function resetView(){if(reference.value)schematicView.value?.reset();else setView('iso')}
 function setView(next){reference.value=false;cameraView.value=next;scene?.setView(next)}
-function showPanel(tab){panelTab.value=tab;inspectorOpen.value=window.matchMedia('(max-width:1100px)').matches}
+function showPanel(tab){const close=inspectorOpen.value&&panelTab.value===tab;panelTab.value=tab;inspectorOpen.value=!close}
 function openSource(){sourceChoice.value=mode.value;apiUrl.value=telemetry.endpoint.value;dialogError.value='';sourceDialog.value.showModal()}
 function saveSource(){if(sourceChoice.value==='api'){try{const url=new URL(apiUrl.value,location.origin);if(!['http:','https:'].includes(url.protocol)||!apiUrl.value.trim())throw new Error()}catch{dialogError.value='請輸入有效的 HTTP / HTTPS API 路徑。';return}}telemetry.setSource(sourceChoice.value,apiUrl.value.trim());sourceDialog.value.close()}
 async function saveArtifact(blob,kind,name){
@@ -52,10 +66,11 @@ async function exportModel(){exporting.value=true;exportError.value='';try{if(re
 async function saveScene(){try{await saveArtifact(await captureScene(reference.value?schematicView.value:scene,values.value,{width:reference.value?DIAGRAM.width:canvasHost.value.clientWidth,height:reference.value?DIAGRAM.height:canvasHost.value.clientHeight,selectedId:selectedId.value,status:status.value,labels:reference.value?[]:labels.value}),reference.value?'png2d':'png',reference.value?'aquatic-scada-2d.png':'aquatic-scada-scene.png')}catch(e){exportError.value=`圖片儲存失敗：${e.message}`}}
 function escape(event){if(event.key==='Escape'){inspectorOpen.value=false;immersive.value=false;reference.value=false}}
 watch([values,usable,cutaway,motion,overlayMode],()=>scene?.update(values.value,{usable:usable.value,cutaway:cutaway.value,motion:motion.value,allTags:overlayMode.value!=='none'}))
-watch(reference,active=>{scene?.setVisible(!active);router.replace({query:{...route.query,view:active?'2d':undefined}})})
+watch(reference,active=>{scene?.setVisible(!active);router.replace({query:{...route.query,view:active?'2d':undefined}});if(active&&phoneViewport())nextTick(()=>schematicView.value?.focus(selectedId.value))})
 watch(()=>route.query.view,view=>reference.value=view==='2d')
-onMounted(()=>{window.addEventListener('keydown',escape);try{scene=createPlantScene(canvasHost.value,{onSelect:id=>select(id),onLabels:updateLabels,onReady:()=>sceneReady.value=true,onError:message=>sceneError.value=message});scene.update(values.value,{usable:usable.value,cutaway:cutaway.value,motion:motion.value,allTags:overlayMode.value!=='none'});scene.select(selectedId.value);scene.setVisible(!reference.value)}catch(e){sceneError.value=`無法啟用 3D 顯示：${e.message}`}})
-onBeforeUnmount(()=>{window.removeEventListener('keydown',escape);scene?.dispose()})
+function compactChanged(event){if(event.matches)inspectorOpen.value=false;nextTick(updateWorkspace)}
+onMounted(()=>{window.addEventListener('keydown',escape);compactViewport=window.matchMedia('(max-width:1599px)');compactViewport.addEventListener('change',compactChanged);inspectorOpen.value=!compactViewport.matches;try{scene=createPlantScene(canvasHost.value,{onSelect:id=>select(id),onLabels:updateLabels,onReady:()=>sceneReady.value=true,onError:message=>sceneError.value=message});scene.update(values.value,{usable:usable.value,cutaway:cutaway.value,motion:motion.value,allTags:overlayMode.value!=='none'});scene.select(selectedId.value);scene.setVisible(!reference.value);if(phoneViewport()&&!reference.value)scene.focus(selectedId.value);workspaceObserver=new ResizeObserver(()=>nextTick(updateWorkspace));workspaceObserver.observe(viewport.value);nextTick(updateWorkspace)}catch(e){sceneError.value=`無法啟用 3D 顯示：${e.message}`}})
+onBeforeUnmount(()=>{window.removeEventListener('keydown',escape);compactViewport?.removeEventListener('change',compactChanged);workspaceObserver?.disconnect();scene?.dispose()})
 </script>
 
 <template>
@@ -64,9 +79,8 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',escape);scene?.dispose
     <div class="twin-shell">
       <AquaticRail />
       <main class="twin-main">
-        <section class="twin-heading"><div><p class="eyebrow">WATER TREATMENT / DIGITAL TWIN</p><h1>水系統數位圖控 <span>{{reference?'2D':'3D'}}</span></h1></div><div class="heading-actions"><button class="soft-button" :disabled="(!reference&&!sceneReady)||exporting" @click="exportModel"><TwinIcon name="download" :size="16"/>{{exporting?'匯出中…':reference?'匯出工程圖':'匯出模型'}}</button><button class="soft-button" @click="immersive=!immersive"><TwinIcon name="expand" :size="16"/>{{immersive?'返回總覽':'專注圖控'}}</button></div></section>
         <section class="process-panel">
-          <div class="process-toolbar"><div class="process-title"><TwinIcon :name="reference?'layers':'cube'" :size="18"/><h2>製程全景</h2><span class="scene-count">35 元件</span></div><div class="toolbar-actions"><div class="view-selector" aria-label="顯示模式"><button v-for="v in [{id:'iso',label:'立體'},{id:'top',label:'俯視'},{id:'front',label:'正視'}]" :key="v.id" :class="{'is-active':!reference&&cameraView===v.id}" @click="setView(v.id)">{{v.label}}</button><button :class="{'is-active':reference}" :aria-pressed="reference" @click="reference=true">2D 圖控</button></div><button class="panel-toggle" @click="showPanel('metrics')"><TwinIcon name="pressure" :size="16"/>儀表</button><button class="panel-toggle" @click="showPanel('equipment')"><TwinIcon name="layers" :size="16"/>設備</button><button v-if="immersive" class="icon-button" aria-label="離開專注圖控" @click="immersive=false"><TwinIcon name="close"/></button></div></div>
+          <div class="process-toolbar"><div class="process-title"><TwinIcon :name="reference?'layers':'cube'" :size="18"/><h1>水系統數位圖控</h1><span class="scene-count">{{reference?'2D':'3D'}} · 35 元件</span></div><div class="toolbar-actions"><div class="view-selector" aria-label="顯示模式"><button v-for="v in [{id:'iso',label:'立體'},{id:'top',label:'俯視'},{id:'front',label:'正視'}]" :key="v.id" :class="{'is-active':!reference&&cameraView===v.id}" @click="setView(v.id)">{{v.label}}</button><button :class="{'is-active':reference}" :aria-pressed="reference" @click="reference=true">2D 圖控</button></div><button class="panel-toggle" :aria-expanded="inspectorOpen&&panelTab==='metrics'" aria-controls="twin-monitor-panel" @click="showPanel('metrics')"><TwinIcon name="pressure" :size="16"/>儀表</button><button class="panel-toggle" :aria-expanded="inspectorOpen&&panelTab==='equipment'" aria-controls="twin-monitor-panel" @click="showPanel('equipment')"><TwinIcon name="layers" :size="16"/>設備</button></div><div class="workspace-actions"><button class="icon-button" :aria-label="exporting?'匯出中':reference?'匯出工程圖':'匯出模型'" :title="reference?'匯出工程圖':'匯出模型'" :disabled="(!reference&&!sceneReady)||exporting" @click="exportModel"><TwinIcon name="download" :size="17"/></button><button class="icon-button" :aria-label="immersive?'返回總覽':'專注圖控'" :title="immersive?'返回總覽':'專注圖控'" @click="immersive=!immersive"><TwinIcon :name="immersive?'close':'expand'" :size="18"/></button></div></div>
           <div ref="viewport" class="twin-viewport">
             <div ref="canvasHost" class="twin-canvas"/>
             <div v-if="!reference&&overlayMode!=='none'" class="equipment-labels" :aria-label="showValues?'圖上即時數值':'設備名稱標籤'" :data-overlay-mode="overlayMode">
@@ -85,19 +99,19 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',escape);scene?.dispose
             <div class="selection-identity"><span class="selected-tag">{{selected.tag}}</span><h3>{{selected.name}}</h3><button class="icon-button" aria-label="定位此設備" @click="focusSelected()"><TwinIcon name="target" :size="17"/></button></div>
             <div class="selected-readings"><div v-for="s in analogSelected" :key="s.id" class="dock-reading" :class="{'is-warning':isWarning(s.id,values[s.id])}" :data-signal-id="s.id"><span>{{s.label}}</span><strong>{{formatSignal(s.id,values[s.id])}}<small>{{s.unit}}</small></strong></div><div v-if="digitalSelected.length" class="dock-indicators"><span v-for="s in digitalSelected" :key="s.id"><SignalLamp :value="values[s.id]" :label="s.name"/><small>{{s.type==='level'?shortLevel(s):selected.tag}}</small></span></div><span v-if="!selected.signals.length" class="no-sensor">此設備沒有液位量測</span></div>
           </section>
-          <div class="scene-legend"><div class="circuit-legend"><span v-for="c in CIRCUITS" :key="c.name" :style="{'--circuit-color':c.color}"><i/>{{c.name}}</span></div><span class="lamp-legend"><SignalLamp :value="1" size="small"/>亮燈<SignalLamp :value="0" size="small"/>熄燈<SignalLamp :value="null" size="small"/>未知</span></div>
         </section>
         <div class="scene-settings"><label><input type="checkbox" v-model="cutaway"/>槽體透視</label><label><input type="checkbox" v-model="motion"/>動畫效果</label><fieldset class="scene-display-options" aria-label="圖上顯示，設備標籤與數值互斥"><label><input type="checkbox" v-model="allTags"/>設備標籤</label><label><input type="checkbox" v-model="showValues"/>顯示數值</label></fieldset><span>{{44-missing}} / 44 訊號</span></div>
         <div v-if="error||exportError" class="data-error" role="alert">{{error||exportError}}</div><p v-if="savedArtifact" class="saved-artifact" role="status">已儲存：<a :href="savedArtifact.href" :download="savedArtifact.name">{{savedArtifact.name}}</a></p>
       </main>
       <button v-if="inspectorOpen" class="drawer-scrim" aria-label="關閉儀表面板" @click="inspectorOpen=false"/>
-      <aside class="twin-inspector" :class="{'is-open':inspectorOpen}" aria-label="固定儀表與設備面板">
+      <aside id="twin-monitor-panel" class="twin-inspector" :class="{'is-open':inspectorOpen}" :inert="!inspectorOpen" :aria-hidden="!inspectorOpen" aria-label="儀表與設備浮動面板">
         <div class="inspector-title"><div><p class="eyebrow">PROCESS MONITOR</p><h2>監測面板</h2></div><button class="icon-button close-inspector" aria-label="關閉監測面板" @click="inspectorOpen=false"><TwinIcon name="close"/></button><span class="read-only-badge">唯讀</span></div>
         <div class="inspector-tabs"><button :class="{'is-active':panelTab==='metrics'}" @click="panelTab='metrics'">儀表數值</button><button :class="{'is-active':panelTab==='equipment'}" @click="panelTab='equipment'">設備清單</button><button :class="{'is-active':panelTab==='signals'}" @click="panelTab='signals'">狀態燈</button></div>
         <div class="inspector-content">
           <section v-if="panelTab==='metrics'" class="telemetry-dashboard" aria-label="固定數值儀表板"><div v-for="group in meterGroups" :key="group.name" class="meter-group"><h3>{{group.name}}</h3><div class="meter-grid"><button v-for="id in group.ids" :key="id" class="meter-card" :class="{'is-warning':isWarning(id,values[id]),'is-selected':selected.signals.includes(id)}" @click="select(EQUIPMENT.find(e=>e.signals.includes(id)).id)"><span>{{signalById[id].label}}</span><strong>{{formatSignal(id,values[id])}}<small>{{signalById[id].unit}}</small></strong></button></div></div><p class="measurement-note">{{status}} · 每 3 秒更新<br/>讀值位置固定，旋轉模型時不會移動。</p></section>
           <section v-else-if="panelTab==='equipment'" class="equipment-browser"><label class="equipment-search"><TwinIcon name="search" :size="17"/><input v-model="search" placeholder="搜尋設備或編號" aria-label="搜尋設備或編號"/></label><div class="equipment-list"><button v-for="e in equipmentList" :key="e.id" :class="{'is-selected':selectedId===e.id}" @click="select(e.id,true)"><span class="list-icon" :style="{color:CIRCUITS[e.circuit].color}"><TwinIcon :name="e.type==='tank'||e.type==='chemicalTank'?'drop':e.type==='instrument'?'pressure':e.type==='valve'?'flow':'cube'" :size="18"/></span><span><b>{{e.tag}}</b><small>{{e.name}}</small></span><SignalLamp v-if="['pump','valve'].includes(e.type)" :value="values[e.signalId]" :label="e.name" size="small"/><TwinIcon name="chevron" :size="13"/></button><p v-if="!equipmentList.length" class="measurement-note">沒有符合的設備。</p></div></section>
           <section v-else class="all-signals" aria-label="30 路設備狀態燈"><button v-for="s in DIGITAL" :key="s.id" class="digital-row" @click="select(EQUIPMENT.find(e=>e.signals.includes(s.id)).id,true)"><span>{{s.name}}</span><SignalLamp :value="values[s.id]" :label="s.name"/></button><p class="measurement-note">與設備上的 3D 指示燈同步。</p></section>
+          <div class="scene-legend"><div class="circuit-legend"><span v-for="c in CIRCUITS" :key="c.name" :style="{'--circuit-color':c.color}"><i/>{{c.name}}</span></div><span class="lamp-legend"><SignalLamp :value="1" size="small"/>亮燈<SignalLamp :value="0" size="small"/>熄燈<SignalLamp :value="null" size="small"/>未知</span></div>
         </div>
       </aside>
     </div>

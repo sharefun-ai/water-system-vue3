@@ -11,14 +11,25 @@ export function valueAnnotations(projected,width,height=Infinity){
 }
 
 // Screen-space cards: zoom changes the model, never the text size.
-export function placeAnnotations(projected,width,height,selectedId,previous=[],obstacles){
+export function placeAnnotations(projected,width,height,selectedId,previous=[],obstacles,reserved=[]){
   const compact=width<720,landscape=compact&&height<400,placed=[],prior=new Map(previous.filter(l=>l.layoutWidth===width&&l.layoutHeight===height).map(l=>[l.id,l]))
   const font=compact?12:13,tagFont=compact?10:11,defaultHeight=compact?28:32,gap=5
   const textWidth=(text,size)=>[...text].reduce((n,c)=>n+(/[\u2e80-\uffff]/.test(c)?size:size*.61),0)
   const bounds={left:8,top:landscape?28:38,right:width-(landscape?8:58),bottom:height-(landscape?6:30)}
+  for(const r of reserved){if(r.x>width*.45&&r.h>height*.5)bounds.right=Math.min(bounds.right,r.x-6);if(r.y>height*.5&&r.x<width*.45)bounds.bottom=Math.min(bounds.bottom,r.y-6)}
   const overlap=(a,b,pad=0)=>Math.max(0,Math.min(a.x+a.w+pad,b.x+b.w+pad)-Math.max(a.x-pad,b.x-pad))*Math.max(0,Math.min(a.y+a.h+pad,b.y+b.h+pad)-Math.max(a.y-pad,b.y-pad))
   const bodies=obstacles||projected.filter(l=>l.visible&&l.body).map(l=>l.body)
   const priority={tank:0,membrane:1,chemicalTank:2,instrument:3,pump:4,valve:5}
+  // When floating controls leave too little room, keep the selected and major
+  // equipment readable. Remaining devices stay available in the equipment list.
+  const clearCards=cards=>{
+    if(!reserved.length)return cards
+    const kept=[]
+    for(const card of [...cards].sort((a,b)=>(b.id===selectedId)-(a.id===selectedId)||priority[a.type]-priority[b.type])){
+      if(!reserved.some(r=>overlap(card,r,2)>0)&&!kept.some(r=>overlap(card,r,1)>0))kept.push(card)
+    }
+    return kept
+  }
   const items=projected.filter(l=>l.visible).sort((a,b)=>(b.id===selectedId)-(a.id===selectedId)||priority[a.type]-priority[b.type]||a.id.localeCompare(b.id))
   for(const l of items){
     const w=Math.min(bounds.right-bounds.left,l.cardWidth||Math.ceil(20+textWidth(l.tag,tagFont)+(l.name?9+textWidth(l.name,font):0))),h=l.cardHeight||defaultHeight
@@ -27,7 +38,7 @@ export function placeAnnotations(projected,width,height,selectedId,previous=[],o
       const box={x:Math.max(bounds.left,Math.min(bounds.right-w,cx)),y:Math.max(bounds.top,Math.min(bounds.bottom-h,cy)),w,h}
       const collisions=placed.reduce((n,p)=>n+overlap(box,p,gap/2),0)
       const covered=bodies.reduce((n,p)=>n+overlap(box,p),0)
-      const tools=landscape?overlap(box,{x:width-150,y:height-52,w:150,h:52},3):0
+      const tools=(landscape?overlap(box,{x:width-150,y:height-52,w:150,h:52},3):0)+reserved.reduce((sum,r)=>sum+overlap(box,r,3),0)
       const distance=Math.hypot(box.x+w/2-ax,box.y+h/2-ay)
       const movement=old?Math.hypot(box.x-old.x,box.y-old.y):0
       const cost=(collisions+tools)*1e6+covered*2+distance*3+movement*.15
@@ -69,8 +80,9 @@ export function placeAnnotations(projected,width,height,selectedId,previous=[],o
         for(const l of row.items){const y=rowY,ex=Math.max(x+5,Math.min(x+l.w-5,l.ax)),ey=l.ay<y+l.h/2?y:y+l.h;packed.push({...l,x,y,ex,ey});x+=l.w+rowGap}
         rowY+=row.height+rowSpacing
       })
-      return packed
+      const freePlaced=clearCards(placed),freePacked=clearCards(packed)
+      return !reserved.length||freePacked.some(c=>c.id===selectedId)&&freePacked.length>=freePlaced.length?freePacked:freePlaced
     }
   }
-  return placed
+  return clearCards(placed)
 }

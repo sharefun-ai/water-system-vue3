@@ -15,7 +15,6 @@ function enter(item){
   entering.value=item.to;menuOpen.value=false;water?.enter();sound?.pause(true)
   timer=setTimeout(()=>router.push(item.to).catch(()=>{entering.value='';water?.reset();sound?.pause(paused.value)}),media?.matches?180:480)
 }
-function toggleMotion(){paused.value=!paused.value;water?.pause(paused.value);sound?.pause(paused.value)}
 function toggleSound(){const wasPlaying=audio.value==='running';if(paused.value){paused.value=false;water?.pause(false);sound?.pause(false)}if(wasPlaying)sound?.toggle();else sound?.enable()}
 function quietChange(event){water?.quiet(event.matches)}
 function skipOpening(){opening.value=false;water?.skipIntro();nextTick(()=>surface.value?.focus({preventScroll:true}))}
@@ -49,7 +48,6 @@ onBeforeUnmount(()=>{disposed=true;clearTimeout(timer);water?.dispose();sound?.d
     <div class="water-hint" aria-hidden="true"><span class="water-touch-mark"/><span>觸碰水面</span></div>
     <div class="water-controls" :inert="opening">
       <button class="water-icon" :aria-label="audio==='running'?'靜音水聲與旋律':'開啟水聲與旋律'" :aria-pressed="audio==='running'" @click="toggleSound"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4V9Z"/><path v-if="audio==='running'" d="M16 8a6 6 0 0 1 0 8 M19 5a10 10 0 0 1 0 14"/><path v-else d="m17 9 5 6 m0-6-5 6"/></svg></button>
-      <button class="water-icon" :disabled="!ready" :aria-label="paused?'播放水面流動':'暫停水面流動'" :aria-pressed="paused" @click="toggleMotion"><TwinIcon :name="paused?'play':'pause'" :size="18"/></button>
     </div>
     <nav class="water-navigation" :inert="opening" aria-label="水系統功能入口"><a v-for="item in PROCESS_LINKS" :key="item.to" :href="`#${item.to}`" :class="{'is-selected':entering===item.to}" @click.prevent="enter(item)"><TwinIcon :name="item.icon" :size="19"/><span>{{item.name}}</span><TwinIcon name="arrow" :size="15"/></a></nav>
     <div class="water-entry-veil" aria-hidden="true"/>

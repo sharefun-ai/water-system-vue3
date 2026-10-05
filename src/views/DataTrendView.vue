@@ -169,7 +169,7 @@ onBeforeUnmount(() => { disposed = true; initialized = false; requestNumber++; c
         <article v-for="stat in stats" :key="stat.label" class="trend-stat" :class="{ 'is-primary': stat.primary, 'is-pending': initialLoading }">
           <div class="stat-top"><span>{{ stat.label }}</span><TwinIcon :name="stat.icon" :size="18" /></div>
           <div v-if="initialLoading" class="stat-skeleton" aria-hidden="true"><i /><i /></div>
-          <div v-else class="stat-number"><strong>{{ fmt(stat.value) }}</strong><span>{{ category.unit }}</span></div>
+          <div v-else class="stat-number" :class="{'has-long-reading':fmt(stat.value).length>8}"><strong>{{ fmt(stat.value) }}</strong><span>{{ category.unit }}</span></div>
           <p><span v-if="stat.primary && stat.value !== null" class="reading-dot" />{{ initialLoading ? '正在讀取測點…' : stat.note }}</p>
         </article>
       </section>

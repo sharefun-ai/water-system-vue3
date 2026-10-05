@@ -27,7 +27,7 @@ onBeforeUnmount(() => { document.removeEventListener('keydown', dismiss); docume
       <router-link v-for="item in navigation.slice(0, 5)" :key="item.to" :to="item.to" :class="{ 'is-current': route.path === item.to }" :aria-current="route.path === item.to ? 'page' : undefined">{{ item.name }}</router-link>
     </nav>
     <div class="header-status">
-      <span class="status-pill" :class="[`is-${tone}`, { 'is-disconnected': tone === 'warning' }]" role="status"><i />{{ CLOUD_SIMULATION ? '雲端模擬數據 · ' + status : status }}</span>
+      <span class="status-pill" :class="[`is-${tone}`, { 'is-disconnected': tone === 'warning' }]" role="status"><i /><span class="status-label">{{ CLOUD_SIMULATION ? '雲端模擬數據 · ' + status : status }}</span></span>
       <span v-if="time" class="header-clock" title="系統時間">{{ time }}</span>
       <button v-if="sourceSettings" class="icon-button" aria-label="數據來源設定" @click="$emit('source-settings')"><TwinIcon name="settings" /></button>
       <button class="icon-button mobile-menu" aria-label="行動版模組導覽" aria-controls="aquatic-mobile-navigation" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen"><TwinIcon :name="menuOpen ? 'close' : 'layers'" /></button>

@@ -1,13 +1,10 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import oceanTexture from '../assets/ocean-depth.webp'
-import TwinIcon from '../digital-twin/TwinIcon.vue'
 const props = defineProps({ active: { type: Boolean, default: true } })
 
-const surface = ref(null), canvas = ref(null), ready = ref(false), mounted = ref(false), paused = ref(false), reduced = ref(false)
-// This water interface starts with gentle movement; an explicit pause remains saved.
-// The system's reduced-motion preference slows the surface instead of hiding it.
-const animated = computed(() => !paused.value)
+const surface = ref(null), canvas = ref(null), ready = ref(false), reduced = ref(false)
+// Keep the water moving while the page is visible; reduced motion slows it gently.
 let gl, program, texture, buffer, frame, observer, resizeObserver, media, image, disposed = false, visible = true, time = 0, previous = 0, lastDraw = 0, frames = 0
 const vertex = `attribute vec2 position; varying vec2 uv; void main(){uv=position*.5+.5;gl_Position=vec4(position,0.,1.);}`
 const fragment = `precision mediump float;
@@ -35,7 +32,7 @@ void main(){
   gl_FragColor=vec4(color,1.);
 }`
 function stop() { cancelAnimationFrame(frame); frame = null; previous = 0 }
-function canRun() { return props.active && ready.value && !disposed && !document.hidden && visible && animated.value }
+function canRun() { return props.active && ready.value && !disposed && !document.hidden && visible }
 function draw(stamp) {
   if (!canRun()) { stop(); return }
   frame = requestAnimationFrame(draw)
@@ -48,11 +45,6 @@ function draw(stamp) {
 }
 function resume() { stop(); if (canRun()) frame = requestAnimationFrame(draw) }
 watch(() => props.active, resume)
-function toggle() {
-  paused.value = animated.value
-  try { localStorage.setItem('aquatic-ocean-motion', paused.value ? 'off' : 'on') } catch { /* Motion can still be controlled for this visit. */ }
-  resume()
-}
 function motionChange() { reduced.value = media.matches; resume() }
 function resize() {
   if (!gl || disposed) return
@@ -72,9 +64,7 @@ function shader(type, source) {
 }
 function lost(event) { event.preventDefault(); ready.value = false; stop() }
 onMounted(() => {
-  mounted.value = true
   media = window.matchMedia('(prefers-reduced-motion: reduce)'); reduced.value = media.matches
-  try { paused.value = localStorage.getItem('aquatic-ocean-motion') === 'off' } catch { /* Default gentle movement still works without browser storage. */ }
   media.addEventListener('change', motionChange); document.addEventListener('visibilitychange', resume)
   canvas.value.addEventListener('webglcontextlost', lost)
   try {
@@ -109,8 +99,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="surface" class="living-ocean" :class="{ 'is-playing': animated && active, 'uses-gpu': ready, 'is-quiet': reduced, 'is-inactive': !active }" aria-hidden="true" :data-renderer="ready ? 'ready' : 'fallback'" :data-motion="animated ? 'playing' : 'paused'" :data-active="active" :style="{ backgroundImage: `url(${oceanTexture})` }"><div class="living-ocean-photo"/><canvas ref="canvas" :class="{ 'is-ready': ready }" /><div class="living-ocean-shade" /></div>
-  <button v-if="mounted" v-show="active" class="ocean-motion-control" :aria-pressed="animated" :aria-label="animated ? '暫停海面流動' : '播放海面流動'" @click="toggle"><TwinIcon :name="animated ? 'pause' : 'play'" :size="12" /><span>{{ animated ? '水面流動' : '播放水面' }}</span></button>
+  <div ref="surface" class="living-ocean" :class="{ 'is-playing': active, 'uses-gpu': ready, 'is-quiet': reduced, 'is-inactive': !active }" aria-hidden="true" :data-renderer="ready ? 'ready' : 'fallback'" data-motion="playing" :data-active="active" :style="{ backgroundImage: `url(${oceanTexture})` }"><div class="living-ocean-photo"/><canvas ref="canvas" :class="{ 'is-ready': ready }" /><div class="living-ocean-shade" /></div>
 </template>
 
 <style>
@@ -124,5 +113,5 @@ onBeforeUnmount(() => {
 .living-ocean canvas{position:absolute;inset:0;display:block;width:100%;height:100%;opacity:0;transition:opacity .7s}
 .living-ocean canvas.is-ready{opacity:1}
 .living-ocean-shade{position:absolute;inset:0;background:linear-gradient(180deg,#0b182110 0%,#0b182135 25%,#0b1821e0 76%,#0b1821 100%),linear-gradient(110deg,#071824a8 10%,#0b273955 62%,#07473b33)}
-.ocean-motion-control{position:fixed;top:calc(var(--aquatic-header-height,68px) + 1px);right:42px;z-index:2;display:flex;align-items:center;gap:6px;min-height:36px;border:0!important;border-radius:5px;background:transparent!important;color:#afcec9!important;font:9px Inter,'Noto Sans TC',sans-serif!important;cursor:pointer;opacity:.8;padding:0 4px!important}.ocean-motion-control:hover{opacity:1}.ocean-motion-control:focus-visible{outline:2px solid #9bf2d2;outline-offset:2px}@media(max-width:767px){.ocean-motion-control{right:15px;min-height:44px;font-size:8px!important}}@media(prefers-reduced-motion:reduce){.living-ocean canvas{transition:none}}
+@media(prefers-reduced-motion:reduce){.living-ocean canvas{transition:none}}
 </style>

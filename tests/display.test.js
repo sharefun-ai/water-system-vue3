@@ -37,3 +37,16 @@ test('dense projected readouts stay separated on desktop and phone viewports',()
     }
   }
 })
+test('floating controls and the selected equipment dock never cover responsive annotations',()=>{
+  const intersects=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y
+  for(const [width,height] of [[1306,598],[375,603],[844,258]]){
+    const reserved=[{x:12,y:height-75,w:Math.min(470,width-80),h:65},{x:width-60,y:Math.max(40,height/2-120),w:50,h:Math.min(240,height-50)}]
+    const projected=EQUIPMENT.map(e=>({...e,x:width/2,y:height/2,visible:true}))
+    const cards=placeAnnotations(projected,width,height,'T02',[],[],reserved)
+    assert.ok(cards.some(c=>c.id==='T02'),'selected equipment keeps its label')
+    for(const [i,card] of cards.entries()){
+      assert.ok(!reserved.some(r=>intersects(card,r)))
+      assert.ok(!cards.slice(i+1).some(other=>intersects(card,other)))
+    }
+  }
+})
